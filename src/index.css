@@ -1,0 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #FFFFFF; /* Editorial heading white */
+  --color-brand-secondary: #C5A880; /* Premium Champagne Gold */
+  --color-brand-accent: rgba(197, 168, 128, 0.15); /* Very thin gold transparent border */
+  --color-brand-bg: #0A0A0A; /* Matte Black background */
+  --color-brand-surface: #121212; /* Charcoal Black surface */
+  --color-brand-surface-muted: #1E1E1E; /* Dark Graphite surface */
+  --color-brand-text: #F5F5F5; /* Soft pure white body text */
+  --color-brand-text-muted: #9E9E9E; /* Soft gray muted text */
+  --color-brand-gold-dark: #C5A880; /* Gold for highlight states */
+  --color-brand-gold-light: #1A1612; /* Dark luxury gold-charcoal */
+  
+  --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  /* Ease curves */
+  --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-premium: cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+/* Custom Base Layer Overrides */
+@layer base {
+  body {
+    background-color: var(--color-brand-bg);
+    color: var(--color-brand-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Custom Utilities for Premium Visual Polish */
+.font-serif-italic {
+  font-family: var(--font-serif);
+  font-style: italic;
+}
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #C5A880 0%, #A4845B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bg-gold-gradient {
+  background: linear-gradient(135deg, #C5A880 0%, #A4845B 100%);
+}
+
+.gold-border-glow:hover {
+  border-color: var(--color-brand-secondary);
+  box-shadow: 0 0 15px rgba(197, 168, 128, 0.15);
+}
+
+/* Scrollbar Styling for Premium Aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-brand-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(197, 168, 128, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand-secondary);
+}
+
+/* Custom utilities for Framer Motion replacement/micro-effects */
+.premium-blur-glass {
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(197, 168, 128, 0.15);
+}
+
+/* Elegant gold divider decoration */
+.luxury-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(197, 168, 128, 0.3) 50%, transparent);
+  width: 100%;
+}

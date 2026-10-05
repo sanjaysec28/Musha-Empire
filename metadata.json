@@ -1,0 +1,8 @@
+{
+  "name": "Remix Musha Empire Unisex Salon",
+  "description": "Premium design foundation, global design system, and responsive UI component architecture for Musha Empire Unisex Salon.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
