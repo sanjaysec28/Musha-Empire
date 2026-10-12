@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sparkles, Instagram, Facebook, Calendar, Mail, CheckCircle } from 'lucide-react';
+import { settingsRepository } from '../../lib/firestoreService';
+import { FirestoreSalonSettings } from '../../types/firestore';
 import Button from '../ui/Button';
 import MushaEmpireLogo from '../ui/MushaEmpireLogo';
 
@@ -16,6 +18,23 @@ export default function Footer({ onNavigate }: FooterProps = {}) {
   const currentYear = new Date().getFullYear();
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [email, setEmail] = useState('');
+  const [salonSettings, setSalonSettings] = useState<FirestoreSalonSettings | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    settingsRepository.getSalonSettings().then((s) => {
+      if (isMounted && s) setSalonSettings(s);
+    }).catch(err => {
+      console.warn('Notice reading salon settings in Footer:', err);
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  const phoneDisplay = salonSettings?.phone || 'Contact unavailable';
+  const emailDisplay = salonSettings?.email || 'Email unavailable';
+  const addressDisplay = typeof salonSettings?.address === 'object'
+    ? `${salonSettings.address.line1}${salonSettings.address.line2 ? `, ${salonSettings.address.line2}` : ''}, ${salonSettings.address.city || ''}`
+    : (salonSettings?.address || 'Address unavailable');
 
   const serviceColumns = [
     {
@@ -48,7 +67,7 @@ export default function Footer({ onNavigate }: FooterProps = {}) {
   ];
 
   return (
-    <footer id="main-footer" className="bg-[#0A0A0A] text-brand-text pt-24 pb-12 border-t border-brand-secondary/15">
+    <footer id="main-footer" className="bg-[#0A0A0A] text-brand-text pt-20 pb-28 lg:pb-16 border-t border-brand-secondary/15">
       <div id="footer-container" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Top Branding & Subscription Block */}
@@ -58,7 +77,7 @@ export default function Footer({ onNavigate }: FooterProps = {}) {
             <div id="footer-brand-logo" className="flex flex-col select-none items-start">
               <MushaEmpireLogo variant="horizontal" />
             </div>
-            <p id="footer-philosophy" className="font-sans text-xs md:text-sm text-brand-text-muted max-w-sm leading-relaxed font-light">
+            <p id="footer-philosophy" className="font-sans text-xs md:text-sm text-brand-text-muted max-w-sm leading-relaxed font-normal">
               We define hair artistry and holistic aesthetic care. Bringing Scandinavian minimalist luxury and elite craftsmanship together under one crown. Dedicated to absolute safety, premium eco-conscious botanical elixirs, and bespoke salon rituals.
             </p>
             <div id="footer-socials" className="flex items-center space-x-4">
@@ -88,7 +107,7 @@ export default function Footer({ onNavigate }: FooterProps = {}) {
               <p id="newsletter-tag" className="font-sans text-[10px] uppercase tracking-[0.25em] font-semibold text-brand-secondary flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-brand-secondary stroke-[1.5]" /> The Royal Dispatch
               </p>
-              <h3 id="newsletter-title" className="font-serif text-xl md:text-2xl text-brand-primary font-light leading-snug">
+              <h3 id="newsletter-title" className="font-serif text-xl md:text-2xl text-brand-primary font-bold leading-snug">
                 Join our premium roster for member-only invites, priority bookings, and bespoke seasonal beauty updates.
               </h3>
             </div>
@@ -163,25 +182,31 @@ export default function Footer({ onNavigate }: FooterProps = {}) {
           {/* Contact Details */}
           <div id="footer-contact-column" className="space-y-4 col-span-2 md:col-span-1">
             <h4 className="font-sans text-xs uppercase tracking-wider font-semibold text-brand-secondary">
-              The Lounge Suite
+              Salon Concierge
             </h4>
             <div className="space-y-3 font-sans text-xs text-brand-text-muted">
               <p className="leading-relaxed">
-                Mayfair Boulevard, Suite 500
-                <br />
-                London, W1J 8DJ
+                {addressDisplay}
               </p>
               <p className="space-y-1">
                 <span className="block font-medium text-brand-primary">Reservations Desk:</span>
-                <a href="tel:+442079460923" className="hover:text-brand-secondary transition-colors text-brand-text-muted hover:underline decoration-brand-secondary/35 underline-offset-4">
-                  +44 (20) 7946 0923
-                </a>
+                {salonSettings?.phone ? (
+                  <a href={`tel:${salonSettings.phone.replace(/[^\d+]/g, '')}`} className="hover:text-brand-secondary transition-colors text-brand-text-muted hover:underline decoration-brand-secondary/35 underline-offset-4">
+                    {phoneDisplay}
+                  </a>
+                ) : (
+                  <span>{phoneDisplay}</span>
+                )}
               </p>
               <p className="space-y-1">
                 <span className="block font-medium text-brand-primary">Concierge Mail:</span>
-                <a href="mailto:concierge@mushaempire.com" className="hover:text-brand-secondary transition-colors text-brand-text-muted hover:underline decoration-brand-secondary/35 underline-offset-4">
-                  concierge@mushaempire.com
-                </a>
+                {salonSettings?.email ? (
+                  <a href={`mailto:${salonSettings.email}`} className="hover:text-brand-secondary transition-colors text-brand-text-muted hover:underline decoration-brand-secondary/35 underline-offset-4">
+                    {emailDisplay}
+                  </a>
+                ) : (
+                  <span>{emailDisplay}</span>
+                )}
               </p>
             </div>
           </div>

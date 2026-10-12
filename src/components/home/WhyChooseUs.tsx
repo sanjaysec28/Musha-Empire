@@ -34,13 +34,13 @@ export default function WhyChooseUs() {
             <span className="font-sans text-[11px] uppercase tracking-[0.3em] font-semibold text-brand-secondary block">
               THE SOVEREIGN DIFFERENCE
             </span>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-light text-brand-primary">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-brand-primary">
               Why Discerning Guests <br />
-              <span className="italic font-medium">Choose Musha Empire</span>
+              <span className="italic font-bold text-gold-gradient">Choose Musha Empire</span>
             </h2>
           </div>
           <div className="lg:col-span-7">
-            <p className="font-sans text-xs sm:text-sm text-brand-text-muted leading-relaxed font-light">
+            <p className="font-sans text-xs sm:text-sm text-brand-text-muted leading-relaxed font-normal">
               We reject the industrial assembly line salon structure. At Musha Empire, we treat hair and skin care as sacred, individual design assignments. Every hour spent with us is a personalized, unhurried, luxury ritual.
             </p>
           </div>
@@ -72,13 +72,13 @@ export default function WhyChooseUs() {
                     <span className="font-mono text-xs text-brand-secondary/60">0{idx + 1}</span>
                   </div>
                   
-                  <h3 className="font-serif text-lg md:text-xl font-light text-brand-primary">
+                  <h3 className="font-serif text-lg md:text-xl font-bold text-brand-primary">
                     {item.title}
                   </h3>
                 </div>
 
                 {/* Description */}
-                <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-light">
+                <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal">
                   {item.description}
                 </p>
               </Card>

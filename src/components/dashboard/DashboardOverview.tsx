@@ -54,7 +54,7 @@ export default function DashboardOverview({
             <h1 className="font-serif text-3xl md:text-4xl font-semibold tracking-tight text-white">
               Good day, {user.name}
             </h1>
-            <p className="font-sans text-xs text-brand-text-muted mt-2 max-w-md leading-relaxed font-light">
+            <p className="font-sans text-xs text-brand-text-muted mt-2 max-w-md leading-relaxed font-normal">
               Welcome back to your tailored sanctuary portal. Enjoy your priority status, view active bookings, or top up your premium treatments wallet.
             </p>
           </div>

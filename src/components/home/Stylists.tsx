@@ -5,25 +5,25 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { STYLISTS_DATA, StylistItem } from '../../data/salonData';
+import { StylistItem } from '../../data/salonData';
 import Card from '../ui/Card';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
 import { Drawer } from '../ui/Overlay';
-import { Instagram, Star, Award, Sparkles, Check, Send } from 'lucide-react';
+import { Instagram, Star, Award, Sparkles, Check, Send, Users } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { parseStaffBio, isStaffOnLeave } from '../../lib/staffHelpers';
 
 export default function Stylists() {
   const [selectedStylist, setSelectedStylist] = useState<any | null>(null);
   const [conciergeSent, setConciergeSent] = useState(false);
-  const [stylists, setStylists] = useState<any[]>(STYLISTS_DATA);
+  const [stylists, setStylists] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchStylists = async () => {
       if (!isSupabaseConfigured) {
-        setStylists(STYLISTS_DATA);
+        setStylists([]);
         return;
       }
 
@@ -41,32 +41,26 @@ export default function Stylists() {
         const todayStr = new Date().toISOString().split('T')[0];
 
         const mappedAndFiltered = (data || []).map(item => {
-          const localStylist = STYLISTS_DATA.find(s => s.id === item.id || s.name.toLowerCase() === item.full_name.toLowerCase());
           const meta = parseStaffBio(item.bio || '');
           return {
             id: item.id,
             name: item.full_name,
-            role: item.role === 'stylist' ? 'Master Stylist' : (item.role || localStylist?.role || 'Master Artisan'),
-            experience: localStylist?.experience || '7+ Years Experience',
-            specialty: item.specialty || localStylist?.specialty || 'Luxury Artistry',
-            bio: meta.bioText || item.bio || localStylist?.bio || 'Elite hair care artisan specializing in custom bespoke looks.',
-            image: item.image_url || localStylist?.image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-            instagram: localStylist?.instagram || '@musha_empire',
+            role: item.role === 'stylist' ? 'Master Stylist' : (item.role || 'Master Artisan'),
+            experience: 'Certified Professional',
+            specialty: item.specialty || 'Luxury Artistry',
+            bio: meta.bioText || item.bio || 'Elite hair care artisan specializing in custom bespoke looks.',
+            image: item.image_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+            instagram: '@musha_empire',
             leaves: meta.leaves
           };
         }).filter(s => {
           return !isStaffOnLeave(s.leaves, todayStr);
         });
 
-        // Use database stylists, fallback to mock if database table is empty
-        if (mappedAndFiltered.length > 0) {
-          setStylists(mappedAndFiltered);
-        } else {
-          setStylists(STYLISTS_DATA);
-        }
+        setStylists(mappedAndFiltered);
       } catch (err) {
-        console.warn('Notice: Using local salon stylists directory:', err);
-        setStylists(STYLISTS_DATA);
+        console.warn('Notice reading staff directory:', err);
+        setStylists([]);
       } finally {
         setLoading(false);
       }
@@ -96,17 +90,31 @@ export default function Stylists() {
           <span className="font-sans text-[11px] uppercase tracking-[0.3em] font-semibold text-brand-secondary block">
             THE ARTISTS & VISIONARIES
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-light text-brand-primary">
-            Meet Our <span className="italic font-medium">Master Stylists</span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-brand-primary">
+            Meet Our <span className="italic font-bold text-gold-gradient">Master Stylists</span>
           </h2>
           <div className="luxury-divider" />
-          <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-light">
+          <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-normal">
             Globally trained, passionate, and dedicated to haute couture aesthetics. Our stylists do not follow trends—they orchestrate visual harmony matching your essence.
           </p>
         </div>
 
         {/* Stylists Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        {loading ? (
+          <div className="py-20 text-center space-y-4">
+            <div className="h-8 w-8 border-2 border-brand-secondary/30 border-t-brand-secondary rounded-full animate-spin mx-auto" />
+            <p className="font-sans text-xs uppercase tracking-widest text-brand-secondary">Consulting Master Artisan Directory...</p>
+          </div>
+        ) : stylists.length === 0 ? (
+          <div className="py-20 text-center border border-dashed border-brand-secondary/20 p-8 bg-brand-surface/40 space-y-3 max-w-xl mx-auto">
+            <Users className="h-8 w-8 text-brand-secondary/60 mx-auto" />
+            <h3 className="font-serif text-xl font-bold text-brand-primary">Stylist directory being curated</h3>
+            <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal">
+              Our resident master stylists and grooming artisans are allocated per treatment ritual at attendance.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {stylists.map((stylist, idx) => (
             <motion.div
               key={stylist.id}
@@ -141,7 +149,7 @@ export default function Stylists() {
                 {/* Stylist Details */}
                 <div className="p-6 space-y-4">
                   <div className="space-y-1">
-                    <h3 className="font-serif text-lg font-light text-brand-primary leading-tight group-hover:text-brand-secondary transition-colors">
+                    <h3 className="font-serif text-lg font-bold text-brand-primary leading-tight group-hover:text-brand-secondary transition-colors">
                       {stylist.name}
                     </h3>
                     <p className="font-sans text-[11px] text-brand-secondary uppercase tracking-wider font-semibold">
@@ -149,7 +157,7 @@ export default function Stylists() {
                     </p>
                   </div>
 
-                  <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-light">
+                  <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal">
                     <span className="font-medium text-brand-primary block mb-0.5">Specialty:</span>
                     {stylist.specialty}
                   </p>
@@ -176,7 +184,8 @@ export default function Stylists() {
               </Card>
             </motion.div>
           ))}
-        </div>
+          </div>
+        )}
 
         {/* Detailed Profile Drawer */}
         <Drawer
@@ -229,7 +238,7 @@ export default function Stylists() {
 
               {/* Title group */}
               <div className="space-y-1.5">
-                <h3 className="font-serif text-2xl text-brand-primary leading-tight font-light">{selectedStylist.name}</h3>
+                <h3 className="font-serif text-2xl text-brand-primary leading-tight font-bold">{selectedStylist.name}</h3>
                 <p className="font-sans text-xs text-brand-secondary uppercase tracking-widest font-semibold">{selectedStylist.role}</p>
                 <div className="h-[1px] bg-brand-accent w-full mt-2" />
               </div>
@@ -237,7 +246,7 @@ export default function Stylists() {
               {/* Bio block */}
               <div className="space-y-2">
                 <p className="font-sans text-[10px] uppercase tracking-widest font-semibold text-brand-gold-dark">SOCIETY PROFILE</p>
-                <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-light italic">
+                <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal italic">
                   {selectedStylist.bio}
                 </p>
               </div>
@@ -250,14 +259,14 @@ export default function Stylists() {
                     <Award className="h-4.5 w-4.5 text-brand-secondary shrink-0 mt-0.5" />
                     <div>
                       <p className="font-semibold text-brand-primary">Specialty Focus</p>
-                      <p className="text-brand-text-muted text-[11px] font-light">{selectedStylist.specialty}</p>
+                      <p className="text-brand-text-muted text-[11px] font-normal">{selectedStylist.specialty}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5 font-sans text-xs text-brand-text">
                     <Sparkles className="h-4.5 w-4.5 text-brand-secondary shrink-0 mt-0.5" />
                     <div>
                       <p className="font-semibold text-brand-primary">Concierge Care</p>
-                      <p className="text-brand-text-muted text-[11px] font-light">Custom anatomy profiling, organic luxury hair treatments, post-styling advice</p>
+                      <p className="text-brand-text-muted text-[11px] font-normal">Custom anatomy profiling, organic luxury hair treatments, post-styling advice</p>
                     </div>
                   </div>
                 </div>

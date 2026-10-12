@@ -50,8 +50,8 @@ export default function NewsletterSection({
           <span className="font-sans text-[10px] sm:text-xs uppercase tracking-[0.3em] font-semibold text-brand-secondary block">
             The Royal Dispatch
           </span>
-          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl text-brand-primary font-light tracking-tight max-w-2xl mx-auto leading-tight">
-            Acquire <span className="font-serif-italic text-brand-secondary italic">Privilege Updates</span>
+          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl text-brand-primary font-bold tracking-tight max-w-2xl mx-auto leading-tight">
+            Acquire <span className="font-serif-italic text-brand-secondary italic font-bold">Privilege Updates</span>
           </h2>
           <div className="luxury-divider max-w-xs mx-auto" />
           <p className="font-sans text-xs sm:text-sm text-brand-text-muted max-w-xl mx-auto leading-relaxed">
@@ -102,7 +102,7 @@ export default function NewsletterSection({
                 className="bg-brand-surface-muted/10 border border-brand-secondary/30 p-6 max-w-md mx-auto text-center space-y-2"
               >
                 <CheckCircle2 className="h-8 w-8 text-brand-secondary mx-auto mb-2" />
-                <h4 className="font-serif text-lg text-brand-primary font-light">Privilege Card Enrolled!</h4>
+                <h4 className="font-serif text-lg text-brand-primary font-bold">Privilege Card Enrolled!</h4>
                 <p className="font-sans text-xs text-brand-text-muted leading-relaxed">
                   Thank you. Your personal invitation to explore upcoming custom botanicals is being compiled and will arrive in your inbox shortly.
                 </p>

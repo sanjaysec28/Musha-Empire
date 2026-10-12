@@ -1,0 +1,235 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // AUTHORIZATION & RBAC HELPERS
+    // =========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Role verification:
+    // First checks cryptographically verified Custom Claims in Auth Token (most secure).
+    // Falls back to server-stored user document role if custom claim is not set.
+    // Fails closed if neither custom claim nor valid user document exists.
+    function hasRole(targetRole) {
+      return isAuthenticated() && (
+        request.auth.token.role == targetRole ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAny(['role']) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == targetRole
+        )
+      );
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isManager() {
+      return hasRole('manager');
+    }
+
+    function isReceptionist() {
+      return hasRole('receptionist');
+    }
+
+    function isStylist() {
+      return hasRole('stylist');
+    }
+
+    function isCashier() {
+      return hasRole('cashier');
+    }
+
+    function isCustomer() {
+      return hasRole('customer');
+    }
+
+    // Composite RBAC helper for administrative and managerial CMS actions
+    function isManagement() {
+      return isAdmin() || isManager();
+    }
+
+    // Composite RBAC helper for all salon staff positions
+    function isStaff() {
+      return isAuthenticated() && (
+        (request.auth.token.keys().hasAny(['role']) &&
+         request.auth.token.role in ['admin', 'manager', 'receptionist', 'stylist', 'cashier', 'staff']) ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAny(['role']) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'manager', 'receptionist', 'stylist', 'cashier', 'staff']
+        )
+      );
+    }
+
+    // =========================================================================
+    // 1. USERS COLLECTION
+    // Patrons can read & manage only their own profile.
+    // Staff can view customer profiles for front-desk operations, appointments, and billing.
+    // Strict privilege escalation prevention: customers cannot self-grant privileged
+    // roles, nor directly alter wallet balances, loyalty points, or memberships.
+    // Fails closed when authorization data is missing.
+    // =========================================================================
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isStaff() || isAdmin();
+
+      // On creation, non-admins can only assign 'customer' role with zero initial wallet/loyalty
+      allow create: if (
+        isOwner(userId) &&
+        (!request.resource.data.keys().hasAny(['role']) || request.resource.data.role == 'customer') &&
+        (!request.resource.data.keys().hasAny(['walletBalance']) || request.resource.data.walletBalance == 0) &&
+        (!request.resource.data.keys().hasAny(['wallet_balance']) || request.resource.data.wallet_balance == 0) &&
+        (!request.resource.data.keys().hasAny(['loyaltyPoints']) || request.resource.data.loyaltyPoints == 0) &&
+        (!request.resource.data.keys().hasAny(['loyalty_points']) || request.resource.data.loyalty_points == 0) &&
+        (!request.resource.data.keys().hasAny(['membershipPlan']) || request.resource.data.membershipPlan in ['None', 'none']) &&
+        (!request.resource.data.keys().hasAny(['membership_plan']) || request.resource.data.membership_plan in ['None', 'none']) &&
+        (!request.resource.data.keys().hasAny(['membershipExpiryDate', 'membership_expiry_date'])) &&
+        (!request.resource.data.keys().hasAny(['membershipStartDate', 'membership_start_date'])) &&
+        (!request.resource.data.keys().hasAny(['isActive', 'is_active']) || request.resource.data.isActive == true || request.resource.data.is_active == true)
+      ) || isAdmin();
+
+      // On update, non-admins cannot modify protected fields: role, wallet, loyalty, membership
+      allow update: if (
+        isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'role',
+          'walletBalance',
+          'wallet_balance',
+          'loyaltyPoints',
+          'loyalty_points',
+          'membershipPlan',
+          'membership_plan',
+          'membershipExpiryDate',
+          'membership_expiry_date',
+          'membershipStartDate',
+          'membership_start_date',
+          'isActive',
+          'is_active'
+        ])
+      ) || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // =========================================================================
+    // 2. SERVICES CATALOG COLLECTION
+    // Public visitors can read active salon rituals.
+    // Staff can read all services (including inactive drafts).
+    // Catalog management, pricing, and durations are admin/manager controlled.
+    // =========================================================================
+    match /services/{serviceId} {
+      allow read: if resource.data.is_active == true || resource.data.isActive == true || isStaff();
+      allow write: if isManagement();
+    }
+
+    // =========================================================================
+    // 3. OFFERS & PROMOTIONS COLLECTION
+    // Public visitors can read active promotional vouchers.
+    // Creation and publishing are admin/manager controlled.
+    // =========================================================================
+    match /offers/{offerId} {
+      allow read: if resource.data.is_active == true || resource.data.isActive == true || isStaff();
+      allow write: if isManagement();
+    }
+
+    // =========================================================================
+    // 4. GALLERY & EDITORIAL PORTFOLIO COLLECTION
+    // Public visitors can read published showcase photography.
+    // Publishing, reordering, and curation are admin/manager controlled.
+    // =========================================================================
+    match /gallery/{itemId} {
+      allow read: if resource.data.is_active == true || 
+                     resource.data.isActive == true || 
+                     !resource.data.keys().hasAny(['is_active', 'isActive']) || 
+                     isStaff();
+      allow write: if isManagement();
+    }
+
+    // =========================================================================
+    // 5. SALON SETTINGS COLLECTION
+    // Public visitors can read only intentionally public settings (homepage, salon, general).
+    // settings/homepage_draft is restricted to authorized admin and manager roles.
+    // Private settings documents are protected from public and customer access.
+    // CMS publishing and salon profile editing allowed by admin/manager.
+    // Sensitive/private settings modifications require admin.
+    // =========================================================================
+    match /settings/{settingId} {
+      allow read: if (settingId in ['homepage', 'salon', 'general']) || isManagement();
+
+      allow write: if (settingId in ['homepage', 'homepage_draft', 'salon', 'general'] && isManagement()) ||
+                      isAdmin();
+    }
+
+    // =========================================================================
+    // 6. BOOKINGS COLLECTION
+    // Patrons can read only their own bookings; assigned stylists and staff can read
+    // for salon operations.
+    // Direct client-side write permissions (create, update, delete) are strictly
+    // REMOVED for ALL browser clients (including admins).
+    // All creation, cancellation, rescheduling, slot allocation, and payment status
+    // updates MUST execute via trusted Cloud Functions (Admin SDK) to preserve
+    // atomic synchronization and salon integrity.
+    // =========================================================================
+    match /bookings/{bookingId} {
+      allow read: if (isAuthenticated() && 
+                     (resource.data.customer_id == request.auth.uid || 
+                      resource.data.userId == request.auth.uid ||
+                      resource.data.staff_id == request.auth.uid ||
+                      resource.data.staffId == request.auth.uid)) || 
+                     isStaff();
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // 7. INTERNAL SLOTS COLLECTION
+    // Contains internal booking references, staff allocations, and patron metadata.
+    // Restricted to staff and administrators for schedule management.
+    // Public visitors and regular patrons CANNOT read internal slots.
+    // Direct client writes are blocked; all slot allocations occur server-side.
+    // =========================================================================
+    match /slots/{slotId} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // 7b. SANITIZED PUBLIC AVAILABILITY COLLECTIONS
+    // (/public_availability and /availability)
+    // Exposes ONLY date, start_time, end_time, and status ('available'|'unavailable'|'blocked').
+    // Exposes ZERO customer IDs, booking IDs, staff IDs, or private notes.
+    // Read: public. Direct client writes: strictly BLOCKED (synchronized via Cloud Functions).
+    // =========================================================================
+    match /public_availability/{slotId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /availability/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // 8. TICKETS COLLECTION
+    // Patrons can read only their own check-in passes and QR payloads.
+    // Staff can read for front-desk check-in, scanning, and ticket verification.
+    // Direct client writes are blocked; tickets are created and updated server-side.
+    // =========================================================================
+    match /tickets/{ticketId} {
+      allow read: if (isAuthenticated() && 
+                     (resource.data.customer_id == request.auth.uid || 
+                      resource.data.userId == request.auth.uid)) || 
+                     isStaff();
+      allow write: if false;
+    }
+  }
+}

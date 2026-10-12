@@ -14,7 +14,8 @@ export type DashboardViewType =
   | 'notifications'
   | 'profile'
   | 'settings'
-  | 'reviews';
+  | 'reviews'
+  | 'staff';
 
 export type AuthScreenType =
   | 'login'

@@ -3,9 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, MapPin, Phone, Mail, Clock, MessageSquare, Send, Instagram, Facebook, AlertCircle, CheckCircle } from 'lucide-react';
+import { settingsRepository } from '../../lib/firestoreService';
+import { FirestoreSalonSettings } from '../../types/firestore';
 import Button from '../ui/Button';
 
 export default function ContactPage({
@@ -23,43 +25,69 @@ export default function ContactPage({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [salonSettings, setSalonSettings] = useState<FirestoreSalonSettings | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    settingsRepository.getSalonSettings().then((settings) => {
+      if (isMounted && settings) {
+        setSalonSettings(settings);
+      }
+    }).catch(err => {
+      console.warn('Notice reading salon settings from Firestore:', err);
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  const phoneDisplay = salonSettings?.phone || 'Contact unavailable';
+  const emailDisplay = salonSettings?.email || 'Email unavailable';
+  const hasAddress = Boolean(salonSettings?.address);
+  const addressLine1 = typeof salonSettings?.address === 'object'
+    ? `${salonSettings.address.line1}${salonSettings.address.line2 ? `, ${salonSettings.address.line2}` : ''}`
+    : (salonSettings?.address || 'Address unavailable');
+  const addressLine2 = typeof salonSettings?.address === 'object'
+    ? `${salonSettings.address.city || ''}, ${salonSettings.address.state || ''} ${salonSettings.address.zipCode || ''}`.trim()
+    : (hasAddress ? '' : 'Location details not yet configured');
 
   const contactDetails = [
     {
       icon: <MapPin className="h-5 w-5" />,
-      title: 'Our Sanctuary Address',
-      line1: 'Mayfair Boulevard, Suite 500',
-      line2: 'London, W1J 8DJ',
-      link: 'https://maps.google.com',
-      linkLabel: 'Get Directions',
+      title: 'Salon Address',
+      line1: addressLine1,
+      line2: addressLine2,
+      link: salonSettings?.address ? 'https://maps.google.com' : '#',
+      linkLabel: salonSettings?.address ? 'Get Directions' : 'Address details pending',
     },
     {
       icon: <Phone className="h-5 w-5" />,
       title: 'Reservations Desk',
-      line1: '+44 (20) 7946 0923',
-      line2: 'Toll Free: +44 (800) 123 456',
-      link: 'tel:+442079460923',
-      linkLabel: 'Call Reservation Desk',
+      line1: phoneDisplay,
+      line2: salonSettings?.whatsapp ? `WhatsApp: ${salonSettings.whatsapp}` : '',
+      link: salonSettings?.phone ? `tel:${salonSettings.phone.replace(/[^\d+]/g, '')}` : '#',
+      linkLabel: salonSettings?.phone ? 'Call Reservation Desk' : 'Contact pending',
     },
     {
       icon: <Mail className="h-5 w-5" />,
       title: 'Concierge Mailbox',
-      line1: 'concierge@mushaempire.com',
-      line2: 'corporate@mushaempire.com',
-      link: 'mailto:concierge@mushaempire.com',
-      linkLabel: 'Email Concierge Desk',
+      line1: emailDisplay,
+      line2: '',
+      link: salonSettings?.email ? `mailto:${salonSettings.email}` : '#',
+      linkLabel: salonSettings?.email ? 'Email Concierge Desk' : 'Email pending',
     },
   ];
 
-  const workingHours = [
-    { day: 'Monday', hours: '9:00 AM - 9:00 PM' },
-    { day: 'Tuesday', hours: '9:00 AM - 9:00 PM' },
-    { day: 'Wednesday', hours: '9:00 AM - 9:00 PM' },
-    { day: 'Thursday', hours: '9:00 AM - 9:00 PM' },
-    { day: 'Friday', hours: '9:00 AM - 9:00 PM' },
-    { day: 'Saturday', hours: '9:00 AM - 9:00 PM' },
-    { day: 'Sunday', hours: '10:00 AM - 6:00 PM' },
-  ];
+  const hoursList = (Array.isArray(salonSettings?.opening_hours) && salonSettings.opening_hours.length > 0)
+    ? salonSettings.opening_hours
+    : (Array.isArray(salonSettings?.openingHours) && salonSettings.openingHours.length > 0)
+    ? salonSettings.openingHours
+    : null;
+
+  const workingHours = hoursList && hoursList.length > 0
+    ? hoursList.map(h => ({
+        day: h.day,
+        hours: h.isClosed ? 'Closed' : `${h.open} - ${h.close}`
+      }))
+    : [{ day: 'Operating Schedule', hours: 'Hours unavailable' }];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -100,7 +128,7 @@ export default function ContactPage({
         <span className="font-sans text-[10px] sm:text-xs uppercase tracking-[0.3em] font-semibold text-brand-secondary block mb-3">
           Concierge Services
         </span>
-        <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl text-brand-primary font-light tracking-tight">
+        <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl text-brand-primary font-bold tracking-tight">
           Establish <span className="font-serif-italic text-brand-gold-dark italic">Connection</span>
         </h1>
         <div className="luxury-divider my-6" />
@@ -149,7 +177,7 @@ export default function ContactPage({
 
           {/* Working Hours Frame */}
           <div id="contact-working-hours" className="bg-brand-surface border border-brand-accent/25 p-6 md:p-8">
-            <h3 className="font-serif text-xl text-brand-primary font-light mb-4 flex items-center gap-2">
+            <h3 className="font-serif text-xl text-brand-primary font-bold mb-4 flex items-center gap-2">
               <Clock className="h-5 w-5 text-brand-secondary" /> Sanctuary Operating Hours
             </h3>
             <div className="luxury-divider mb-4" />
@@ -168,39 +196,53 @@ export default function ContactPage({
             <span className="font-sans text-[9px] uppercase tracking-[0.3em] text-brand-secondary font-semibold block">
               Direct WhatsApp Messenger
             </span>
-            <h3 className="font-serif text-xl sm:text-2xl font-light text-white">
+            <h3 className="font-serif text-xl sm:text-2xl font-bold text-white">
               Need Instant Answers?
             </h3>
             <p className="font-sans text-xs text-brand-text-muted leading-relaxed">
               Skip the queue entirely. Chat directly with our private lounge concierge live regarding walk-in availability or master therapist standby schedules.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
-              <a
-                id="contact-whatsapp-link"
-                href="https://wa.me/442079460923"
-                target="_blank"
-                rel="noreferrer"
-                className="w-full sm:w-auto text-center inline-flex justify-center items-center gap-2 bg-[#25D366] text-white font-sans text-xs uppercase tracking-widest font-semibold px-6 py-3 hover:bg-opacity-90 transition-all duration-300"
-              >
-                <MessageSquare className="h-4 w-4 fill-white text-transparent" /> Message WhatsApp Desk
-              </a>
+              {salonSettings?.whatsapp ? (
+                <a
+                  id="contact-whatsapp-link"
+                  href={`https://wa.me/${salonSettings.whatsapp.replace(/[^\d]/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full sm:w-auto text-center inline-flex justify-center items-center gap-2 bg-[#25D366] text-white font-sans text-xs uppercase tracking-widest font-semibold px-6 py-3 hover:bg-opacity-90 transition-all duration-300"
+                >
+                  <MessageSquare className="h-4 w-4 fill-white text-transparent" /> Message WhatsApp Desk
+                </a>
+              ) : (
+                <span className="w-full sm:w-auto text-center inline-flex justify-center items-center gap-2 border border-brand-accent/30 text-brand-text-muted font-sans text-xs uppercase tracking-widest font-semibold px-6 py-3">
+                  <MessageSquare className="h-4 w-4" /> WhatsApp Unavailable
+                </span>
+              )}
               
               {/* Social Directory Links */}
               <div className="flex items-center gap-3">
-                <a
-                  href="#instagram"
-                  className="h-9 w-9 border border-brand-secondary/20 hover:border-brand-secondary hover:text-brand-secondary rounded-none flex items-center justify-center text-brand-text-muted transition-colors"
-                  aria-label="Instagram Link"
-                >
-                  <Instagram className="h-4 w-4" />
-                </a>
-                <a
-                  href="#facebook"
-                  className="h-9 w-9 border border-brand-secondary/20 hover:border-brand-secondary hover:text-brand-secondary rounded-none flex items-center justify-center text-brand-text-muted transition-colors"
-                  aria-label="Facebook Link"
-                >
-                  <Facebook className="h-4 w-4" />
-                </a>
+                {salonSettings?.social_links?.instagram || salonSettings?.socialLinks?.instagram ? (
+                  <a
+                    href={salonSettings?.social_links?.instagram || salonSettings?.socialLinks?.instagram}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="h-9 w-9 border border-brand-secondary/20 hover:border-brand-secondary hover:text-brand-secondary rounded-none flex items-center justify-center text-brand-text-muted transition-colors"
+                    aria-label="Instagram Link"
+                  >
+                    <Instagram className="h-4 w-4" />
+                  </a>
+                ) : null}
+                {salonSettings?.social_links?.facebook || salonSettings?.socialLinks?.facebook ? (
+                  <a
+                    href={salonSettings?.social_links?.facebook || salonSettings?.socialLinks?.facebook}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="h-9 w-9 border border-brand-secondary/20 hover:border-brand-secondary hover:text-brand-secondary rounded-none flex items-center justify-center text-brand-text-muted transition-colors"
+                    aria-label="Facebook Link"
+                  >
+                    <Facebook className="h-4 w-4" />
+                  </a>
+                ) : null}
               </div>
             </div>
           </div>
@@ -213,7 +255,7 @@ export default function ContactPage({
             <span className="font-sans text-[10px] uppercase tracking-widest font-semibold text-brand-secondary flex items-center gap-1">
               <Sparkles className="h-3.5 w-3.5" /> Dispatch Inquiry
             </span>
-            <h2 className="font-serif text-2xl sm:text-3xl text-brand-primary font-light">
+            <h2 className="font-serif text-2xl sm:text-3xl text-brand-primary font-bold">
               Interactive Contact Form
             </h2>
             <div className="luxury-divider" />
@@ -352,7 +394,7 @@ export default function ContactPage({
           <span className="font-sans text-[10px] uppercase tracking-widest font-semibold text-brand-secondary">
             Find the Lounge
           </span>
-          <h2 className="font-serif text-2xl sm:text-3xl text-brand-primary font-light">
+          <h2 className="font-serif text-2xl sm:text-3xl text-brand-primary font-bold">
             An Elegant Blueprint Map Location
           </h2>
           <div className="luxury-divider my-3 max-w-xs mx-auto" />
@@ -381,9 +423,10 @@ export default function ContactPage({
             </div>
 
             {/* Premium Gold overlay tag */}
+            {/* Gold overlay tag */}
             <div className="bg-[#121110] border border-brand-secondary text-brand-secondary py-3 px-5 -mt-2 shadow-2xl relative z-10 text-center select-none whitespace-nowrap">
-              <p className="font-serif text-sm font-semibold tracking-wide text-brand-secondary">MUSHA EMPIRE SANCTUARY</p>
-              <p className="font-sans text-[8px] text-brand-accent/55 tracking-widest uppercase mt-0.5">Mayfair Suite 500, London</p>
+              <p className="font-serif text-sm font-semibold tracking-wide text-brand-secondary">{salonSettings?.salon_name || salonSettings?.salonName || 'MUSHA EMPIRE'}</p>
+              <p className="font-sans text-[8px] text-brand-accent/55 tracking-widest uppercase mt-0.5">{addressLine1}</p>
             </div>
           </div>
 
@@ -394,18 +437,22 @@ export default function ContactPage({
 
           {/* Leftside map overlay */}
           <div className="absolute left-6 top-6 max-w-xs bg-[#1A1917]/95 border border-brand-accent/20 p-5 space-y-3 text-brand-bg backdrop-blur-sm hidden sm:block">
-            <h4 className="font-serif text-sm text-brand-secondary font-semibold">Sanctuary Directions</h4>
+            <h4 className="font-serif text-sm text-brand-secondary font-semibold">Salon Arrival</h4>
             <p className="font-sans text-[11px] text-brand-accent/70 leading-relaxed">
-              Located on Mayfair Boulevard, directly opposite the Royal Albert Park entrance. Valet secure parking is compliments of Musha Empire for all pre-booked appointments.
+              {hasAddress
+                ? `Located at ${addressLine1}. Arrival directions will be provided upon appointment reservation confirmation.`
+                : 'Salon address and arrival directions will be confirmed upon reservation confirmation.'}
             </p>
-            <a
-              href="https://maps.google.com"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 font-sans text-[10px] uppercase tracking-wider font-bold text-brand-secondary hover:underline"
-            >
-              Open External Google Maps &rarr;
-            </a>
+            {hasAddress ? (
+              <a
+                href="https://maps.google.com"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-sans text-[10px] uppercase tracking-wider font-bold text-brand-secondary hover:underline"
+              >
+                Open External Google Maps &rarr;
+              </a>
+            ) : null}
           </div>
         </div>
       </section>

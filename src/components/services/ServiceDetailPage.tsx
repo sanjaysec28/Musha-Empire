@@ -42,7 +42,7 @@ export default function ServiceDetailPage({ serviceId, onBack, onBook, onSelectS
     return service.faqs.map((faq, i) => ({
       id: `service-faq-${i}`,
       title: faq.question,
-      content: <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-light">{faq.answer}</p>,
+      content: <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal">{faq.answer}</p>,
     }));
   }, [service]);
 
@@ -121,7 +121,7 @@ export default function ServiceDetailPage({ serviceId, onBack, onBook, onSelectS
               <span className="font-sans text-[10px] uppercase tracking-widest font-semibold text-brand-secondary bg-brand-secondary/10 px-2.5 py-1 border border-brand-secondary/20 inline-block">
                 {service.category}
               </span>
-              <h1 className="text-3xl md:text-4xl font-serif font-light text-brand-primary leading-tight">
+              <h1 className="text-3xl md:text-4xl font-serif font-bold text-brand-primary leading-tight">
                 {service.name}
               </h1>
               
@@ -137,7 +137,7 @@ export default function ServiceDetailPage({ serviceId, onBack, onBook, onSelectS
               </div>
             </div>
 
-            <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-light">
+            <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-normal">
               {service.shortDescription}
             </p>
 
@@ -176,15 +176,15 @@ export default function ServiceDetailPage({ serviceId, onBack, onBook, onSelectS
           {/* Editorial & Inclusions */}
           <div className="lg:col-span-7 space-y-8">
             <div className="space-y-4">
-              <h3 className="font-serif text-2xl text-brand-primary font-light">The Ritual Experience</h3>
-              <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-light whitespace-pre-line">
+              <h3 className="font-serif text-2xl text-brand-primary font-bold">The Ritual Experience</h3>
+              <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-normal whitespace-pre-line">
                 {service.longDescription}
               </p>
             </div>
 
             {/* Included Procedures */}
             <div className="space-y-4 bg-brand-surface border border-brand-accent p-6 md:p-8">
-              <h3 className="font-serif text-lg text-brand-primary font-medium flex items-center gap-2">
+              <h3 className="font-serif text-lg text-brand-primary font-bold flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-brand-secondary" /> What’s Included in Your Session
               </h3>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
@@ -202,12 +202,12 @@ export default function ServiceDetailPage({ serviceId, onBack, onBook, onSelectS
           <div className="lg:col-span-5 space-y-8">
             {/* Core Benefits */}
             <div className="space-y-4">
-              <h3 className="font-serif text-xl text-brand-primary font-medium">Bespoke Benefits</h3>
+              <h3 className="font-serif text-xl text-brand-primary font-bold">Bespoke Benefits</h3>
               <div className="space-y-4">
                 {service.benefits.map((ben, i) => (
                   <div key={i} className="flex gap-3 text-left">
                     <span className="font-mono text-xs text-brand-secondary font-bold shrink-0 mt-0.5">0{i + 1}.</span>
-                    <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-light">{ben}</p>
+                    <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal">{ben}</p>
                   </div>
                 ))}
               </div>
@@ -215,7 +215,7 @@ export default function ServiceDetailPage({ serviceId, onBack, onBook, onSelectS
 
             {/* Service FAQ */}
             <div className="space-y-4 border-t border-brand-accent pt-8">
-              <h3 className="font-serif text-xl text-brand-primary font-medium flex items-center gap-2">
+              <h3 className="font-serif text-xl text-brand-primary font-bold flex items-center gap-2">
                 <HelpCircle className="h-5 w-5 text-brand-secondary" /> Frequently Asked Questions
               </h3>
               <Accordion id="service-specific-faq" items={accordionFaqs} />
@@ -230,7 +230,7 @@ export default function ServiceDetailPage({ serviceId, onBack, onBook, onSelectS
         <section id="service-related-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-20 border-t border-brand-accent pt-16">
           <div className="mb-8">
             <span className="font-sans text-[10px] uppercase tracking-widest text-brand-secondary block mb-1">Explore Further</span>
-            <h2 className="text-2xl md:text-3xl font-serif text-brand-primary font-light">Similar Luxury Rituals</h2>
+            <h2 className="text-2xl md:text-3xl font-serif text-brand-primary font-bold">Similar Luxury Rituals</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {relatedServices.map((related) => (
@@ -246,7 +246,7 @@ export default function ServiceDetailPage({ serviceId, onBack, onBook, onSelectS
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-4 text-left">
                   <div className="space-y-1">
                     <h4 className="font-serif text-base font-semibold text-brand-primary leading-tight">{related.name}</h4>
-                    <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-light line-clamp-2">{related.shortDescription}</p>
+                    <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal line-clamp-2">{related.shortDescription}</p>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-brand-accent">
                     <span className="font-serif text-base text-brand-gold-dark font-bold">{related.price}</span>

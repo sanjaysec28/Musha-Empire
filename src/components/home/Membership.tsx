@@ -64,11 +64,11 @@ export default function Membership() {
               <span className="font-sans text-[11px] uppercase tracking-[0.3em] font-semibold text-brand-secondary flex items-center gap-2">
                 <Crown className="h-4 w-4" /> SOVEREIGN CIRCLE PRIVILEGE
               </span>
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-light text-brand-primary tracking-tight leading-tight">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-brand-primary tracking-tight leading-tight">
                 Welcome to the <br />
-                <span className="text-gold-gradient font-medium italic">Musha Royal Club</span>
+                <span className="text-gold-gradient font-bold italic">Musha Royal Club</span>
               </h2>
-              <p className="font-sans text-xs sm:text-sm text-brand-text-muted max-w-xl leading-relaxed font-light">
+              <p className="font-sans text-xs sm:text-sm text-brand-text-muted max-w-xl leading-relaxed font-normal">
                 Our Royal Club tier is a membership roster curated for those who value absolute timing precision, privacy, and elite ritual upkeep. Membership is complimentary but restricted to ensure uncompromised service quality.
               </p>
             </div>
@@ -85,8 +85,8 @@ export default function Membership() {
                     {getIcon(benefit.id)}
                   </div>
                   <div className="space-y-1">
-                    <h4 className="font-serif text-base text-brand-primary font-light">{benefit.title}</h4>
-                    <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-light">{benefit.description}</p>
+                    <h4 className="font-serif text-base text-brand-primary font-bold">{benefit.title}</h4>
+                    <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal">{benefit.description}</p>
                   </div>
                 </div>
               ))}
@@ -115,15 +115,15 @@ export default function Membership() {
                   <div className="h-12 w-12 bg-brand-secondary/15 border border-brand-secondary/40 text-brand-secondary rounded-full flex items-center justify-center mx-auto">
                     <ShieldCheck className="h-6 w-6 stroke-[1.5]" />
                   </div>
-                  <h3 className="font-serif text-xl text-brand-primary font-light">Application Received</h3>
-                  <p className="font-sans text-xs text-brand-text-muted max-w-xs mx-auto leading-relaxed">
+                  <h3 className="font-serif text-xl text-brand-primary font-bold">Application Received</h3>
+                  <p className="font-sans text-xs text-brand-text-muted max-w-xs mx-auto leading-relaxed font-normal">
                     Thank you. We have logged your request under referral code <span className="font-mono text-brand-secondary font-semibold">#MC-{Math.floor(1000 + Math.random() * 9000)}</span>. Our membership committee will review your request and dispatch your physical key card shortly.
                   </p>
                 </motion.div>
               ) : (
                 <form id="royal-club-form" onSubmit={handleApply} className="space-y-6">
                   <div className="space-y-2 text-center pb-2 border-b border-brand-secondary/10">
-                    <h3 className="font-serif text-2xl text-brand-primary font-light">Request Invitation</h3>
+                    <h3 className="font-serif text-2xl text-brand-primary font-bold">Request Invitation</h3>
                     <p className="font-sans text-[10px] text-brand-secondary/70 uppercase tracking-widest">
                       MEMBERSHIP RETAILS AT $1,200/YR OR COMPLIMENTARY BY REFERRAL
                     </p>

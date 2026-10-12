@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Eye, X, ChevronLeft, ChevronRight, RefreshCw, ZoomIn, Info } from 'lucide-react';
+import { galleryRepository } from '../../lib/firestoreService';
 import Button from '../ui/Button';
 
 interface GalleryItem {
@@ -33,6 +34,30 @@ export default function GalleryPage({
 }) {
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'haircut' | 'color' | 'bridal' | 'makeup' | 'skin' | 'nails'>('all');
   const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
+  const [firestoreGallery, setFirestoreGallery] = useState<GalleryItem[] | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    galleryRepository.getActiveGallery().then((records) => {
+      if (isMounted && records && records.length > 0) {
+        const mapped: GalleryItem[] = records.map((g) => ({
+          id: g.id,
+          category: (g.category?.toLowerCase() || 'haircut') as any,
+          title: g.title,
+          description: g.caption || '',
+          artist: 'Master Stylist',
+          image: g.image_url || g.imageUrl || 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&w=800&q=80',
+        }));
+        setFirestoreGallery(mapped);
+      } else {
+        setFirestoreGallery([]);
+      }
+    }).catch(err => {
+      console.warn('Notice reading gallery from Firestore:', err);
+      if (isMounted) setFirestoreGallery([]);
+    });
+    return () => { isMounted = false; };
+  }, []);
   
   // Before/After slider control
   const [sliderPosition, setSliderPosition] = useState(50);
@@ -48,105 +73,6 @@ export default function GalleryPage({
     { value: 'nails', label: 'Signature Nails' },
   ];
 
-  const galleryItems: GalleryItem[] = [
-    {
-      id: 'gallery-item-1',
-      category: 'haircut',
-      title: 'Structural Mid-Length Bob',
-      description: 'Precision Japanese razor technique delivering effortless swing and texturized layers.',
-      artist: 'Madame Clara',
-      image: 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-2',
-      category: 'haircut',
-      title: 'Royal Gentleman Shave & Cut',
-      description: 'Zero-gap low fade coupled with a multi-step hot towel herbal oil shave service.',
-      artist: 'Viktor Romanov',
-      image: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-3',
-      category: 'color',
-      title: 'Bespoke Buttercream Balayage',
-      description: 'Multi-tonal hand-painted highlights designed to catch natural afternoon light.',
-      artist: 'Elena Rostova',
-      image: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-4',
-      category: 'color',
-      title: 'Autumn Auburn Melt',
-      description: 'Rich mahogany base blending into high-contrast cinnamon highlights with high-gloss finish.',
-      artist: 'Elena Rostova',
-      image: 'https://images.unsplash.com/photo-1492106087820-71f1a00d2b11?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-5',
-      category: 'bridal',
-      title: 'Baroque Editorial Crown Updo',
-      description: 'Sophisticated textured chignon woven with delicate sterling silver pins and gold leaf accents.',
-      artist: 'Madame Clara',
-      image: 'https://images.unsplash.com/photo-1591555200813-b5e293144194?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-6',
-      category: 'bridal',
-      title: 'Ethereal Floral Half-Up',
-      description: 'Soft bohemian beach waves intertwined with preserved white baby-breath blossoms.',
-      artist: 'Madame Clara',
-      image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-7',
-      category: 'makeup',
-      title: 'Soft Focus Velvet Radiance',
-      description: 'Airbrushed skin finish matched with a modern smokey metallic eye shadow application.',
-      artist: 'Elena Rostova',
-      image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-8',
-      category: 'makeup',
-      title: 'Haute Glass Skin Editorial',
-      description: 'Ultra-dewy hydration styling with bold terracotta lip stains and high-shine cheekbones.',
-      artist: 'Elena Rostova',
-      image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-9',
-      category: 'skin',
-      title: 'Activated Botanical Micro-Peel',
-      description: 'Enzyme-rich fruit acids removing cellular buildup to reveal fresh, oxygenated layers.',
-      artist: 'Viktor Romanov',
-      image: 'https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-10',
-      category: 'skin',
-      title: 'Nourishing Rosewood Face Spa',
-      description: 'Facial massage using therapeutic hot stone triggers and certified organic aromatherapy oils.',
-      artist: 'Viktor Romanov',
-      image: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-11',
-      category: 'nails',
-      title: 'Minimalist Platinum Line Gel',
-      description: 'Bare neutral base embellished with precision micro-fine real platinum dust stripes.',
-      artist: 'Elena Rostova',
-      image: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 'gallery-item-12',
-      category: 'nails',
-      title: 'Champagne Shimmer Chrome',
-      description: 'Multi-layer gold-dust rub over high-gloss protective gel, offering custom luxury longevity.',
-      artist: 'Madame Clara',
-      image: 'https://images.unsplash.com/photo-1610992015732-2449b76344cc?auto=format&fit=crop&w=800&q=80',
-    },
-  ];
-
   const beforeAfterItem: BeforeAfterItem = {
     id: 'ba-1',
     category: 'Hair Coloring Treatment',
@@ -156,9 +82,10 @@ export default function GalleryPage({
     description: 'Nourishing botanical hair reconstructor followed by a warm-gilded caramel blonde balayage blend. Notice the recovery in texture elasticity and radiant shine.',
   };
 
+  const allCreations = firestoreGallery || [];
   const filteredItems = selectedCategory === 'all'
-    ? galleryItems
-    : galleryItems.filter(item => item.category === selectedCategory);
+    ? allCreations
+    : allCreations.filter(item => item.category === selectedCategory);
 
   // Keyboard navigation for Lightbox
   useEffect(() => {
@@ -218,7 +145,7 @@ export default function GalleryPage({
         <span className="font-sans text-[10px] sm:text-xs uppercase tracking-[0.3em] font-semibold text-brand-secondary block mb-3">
           Our Curated Creations
         </span>
-        <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl text-brand-primary font-light tracking-tight">
+        <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl text-brand-primary font-bold tracking-tight">
           Visualizing <span className="font-serif-italic text-brand-gold-dark italic">Absolute Elegance</span>
         </h1>
         <div className="luxury-divider my-6" />
@@ -234,7 +161,7 @@ export default function GalleryPage({
             <span className="font-sans text-[10px] uppercase tracking-widest font-semibold text-brand-secondary flex items-center gap-1.5">
               <RefreshCw className="h-3.5 w-3.5 animate-spin-slow" /> Real transformations
             </span>
-            <h2 className="font-serif text-2xl sm:text-3xl text-brand-primary font-light">
+            <h2 className="font-serif text-2xl sm:text-3xl text-brand-primary font-bold">
               Interactive Before & After
             </h2>
             <p className="font-sans text-sm text-brand-text-muted leading-relaxed">
@@ -338,8 +265,17 @@ export default function GalleryPage({
 
       {/* Masonry Items Grid */}
       <section id="gallery-items-grid" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        <AnimatePresence mode="popLayout">
-          {filteredItems.map((item, index) => (
+        {filteredItems.length === 0 ? (
+          <div className="col-span-full py-20 text-center border border-dashed border-brand-secondary/20 p-8 bg-brand-surface/40 space-y-3 max-w-xl mx-auto">
+            <Sparkles className="h-8 w-8 text-brand-secondary/60 mx-auto" />
+            <h3 className="font-serif text-xl font-bold text-brand-primary">No gallery creations available yet</h3>
+            <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal">
+              Our aesthetic transformation portfolio is currently being compiled with genuine salon session photography.
+            </p>
+          </div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {filteredItems.map((item, index) => (
             <motion.div
               key={item.id}
               id={item.id}
@@ -370,7 +306,7 @@ export default function GalleryPage({
                     <span className="font-sans text-[10px] uppercase tracking-widest font-semibold text-brand-secondary block">
                       {item.category.toUpperCase()} &bull; By {item.artist}
                     </span>
-                    <h3 className="font-serif text-2xl font-light text-brand-bg leading-tight">
+                    <h3 className="font-serif text-2xl font-bold text-brand-bg leading-tight">
                       {item.title}
                     </h3>
                     <p className="font-sans text-xs text-brand-accent/65 leading-relaxed line-clamp-2">
@@ -389,6 +325,7 @@ export default function GalleryPage({
             </motion.div>
           ))}
         </AnimatePresence>
+        )}
       </section>
 
       {/* Lightbox Modal Overlay */}
@@ -455,7 +392,7 @@ export default function GalleryPage({
                     <span className="font-sans text-[10px] uppercase tracking-widest font-semibold text-brand-secondary block mb-1">
                       {filteredItems[activeLightboxIndex].category.toUpperCase()} Selection
                     </span>
-                    <h2 className="font-serif text-2xl sm:text-3xl text-brand-primary font-light">
+                    <h2 className="font-serif text-2xl sm:text-3xl text-brand-primary font-bold">
                       {filteredItems[activeLightboxIndex].title}
                     </h2>
                     <div className="luxury-divider my-3" />

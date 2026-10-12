@@ -63,10 +63,10 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
   // Metadata/Schedule Form states
   const [bioText, setBioText] = useState<string>('');
   const [workingDays, setWorkingDays] = useState<string[]>(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
-  const [startTime, setStartTime] = useState<string>('09:00');
-  const [endTime, setEndTime] = useState<string>('18:00');
-  const [lunchBreak, setLunchBreak] = useState<string>('13:00-14:00');
-  const [weeklyOff, setWeeklyOff] = useState<string[]>(['Saturday', 'Sunday']);
+  const [startTime, setStartTime] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
+  const [lunchBreak, setLunchBreak] = useState<string>('');
+  const [weeklyOff, setWeeklyOff] = useState<string[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
 
   // New leave form states
@@ -85,8 +85,8 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
           const defaultStaffList: DBStaff[] = STYLISTS_DATA.map((s, idx) => ({
             id: s.id,
             full_name: s.name,
-            email: `${s.name.toLowerCase().replace(/\s+/g, '.')}@mushaempire.com`,
-            phone: `+1 (555) 010-000${idx + 1}`,
+            email: '',
+            phone: '',
             role: 'stylist',
             is_active: true,
             is_available: true,
@@ -229,10 +229,10 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
       setImageUrl('');
       setBioText('');
       setWorkingDays(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
-      setStartTime('09:00');
-      setEndTime('18:00');
-      setLunchBreak('13:00-14:00');
-      setWeeklyOff(['Saturday', 'Sunday']);
+      setStartTime('');
+      setEndTime('');
+      setLunchBreak('');
+      setWeeklyOff([]);
       setLeaves([]);
     }
     setNewLeaveType('Vacation');
@@ -584,7 +584,7 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
                     
                     {/* Primary Info */}
                     <div className="space-y-1">
-                      <h4 className="font-serif text-lg font-light text-brand-primary leading-tight flex items-center gap-1.5">
+                      <h4 className="font-serif text-lg font-bold text-brand-primary leading-tight flex items-center gap-1.5">
                         {stylist.full_name}
                       </h4>
                       <p className="font-sans text-[10px] text-brand-secondary uppercase tracking-widest font-semibold">
@@ -597,7 +597,7 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
                   </div>
 
                   {/* Contact details */}
-                  <div className="space-y-1 font-sans text-xs border-t border-brand-accent/30 pt-3 text-brand-text-muted leading-relaxed font-light">
+                  <div className="space-y-1 font-sans text-xs border-t border-brand-accent/30 pt-3 text-brand-text-muted leading-relaxed font-normal">
                     <p><span className="font-semibold text-brand-primary">Email:</span> {stylist.email}</p>
                     {stylist.phone && <p><span className="font-semibold text-brand-primary">Phone:</span> {stylist.phone}</p>}
                     {stylist.specialty && <p><span className="font-semibold text-brand-primary">Specialty:</span> {stylist.specialty}</p>}
@@ -638,7 +638,7 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
-                  <span className="font-sans text-[9px] uppercase tracking-widest text-brand-text-muted font-light">
+                  <span className="font-sans text-[9px] uppercase tracking-widest text-brand-text-muted font-normal">
                     {onLeave ? '🔴 OUT OF OFFICE' : stylist.is_active && stylist.is_available ? '🟢 ACTIVE' : '⚪ SUSPENDED'}
                   </span>
                 </div>
@@ -708,7 +708,7 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
                     </div>
 
                     <div className="space-y-2">
-                      <p className="font-sans text-[11px] text-brand-text-muted font-light leading-normal max-w-xs">
+                      <p className="font-sans text-[11px] text-brand-text-muted font-normal leading-normal max-w-xs">
                         Provide a premium portrait image representing the artist. Files will be locked in secure Supabase Storage.
                       </p>
                       <input
@@ -798,7 +798,7 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
                         type="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        placeholder="+15550100004"
+                        placeholder="Enter phone number"
                         className="w-full bg-brand-bg border border-brand-accent p-3 text-sm text-white font-sans focus:outline-none focus:border-brand-secondary"
                       />
                     </div>
@@ -896,7 +896,7 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
                           type="text"
                           value={startTime}
                           onChange={(e) => setStartTime(e.target.value)}
-                          placeholder="e.g. 09:00"
+                          placeholder="HH:MM"
                           className="w-full bg-brand-bg border border-brand-accent p-2.5 text-xs text-white font-mono focus:outline-none focus:border-brand-secondary"
                         />
                       </div>
@@ -909,7 +909,7 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
                           type="text"
                           value={endTime}
                           onChange={(e) => setEndTime(e.target.value)}
-                          placeholder="e.g. 18:00"
+                          placeholder="HH:MM"
                           className="w-full bg-brand-bg border border-brand-accent p-2.5 text-xs text-white font-mono focus:outline-none focus:border-brand-secondary"
                         />
                       </div>
@@ -1013,7 +1013,7 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
                                 <span className="font-bold text-brand-secondary uppercase text-[10px] tracking-wider block">
                                   {leave.type}
                                 </span>
-                                <span className="text-brand-text-muted font-light font-mono text-[11px] mt-0.5 block">
+                                <span className="text-brand-text-muted font-normal font-mono text-[11px] mt-0.5 block">
                                   {leave.startDate} to {leave.endDate}
                                 </span>
                               </div>

@@ -1,20 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500;1,9..40,600&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600;1,700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
   --color-brand-primary: #FFFFFF; /* Editorial heading white */
   --color-brand-secondary: #C5A880; /* Premium Champagne Gold */
-  --color-brand-accent: rgba(197, 168, 128, 0.15); /* Very thin gold transparent border */
+  --color-brand-accent: rgba(197, 168, 128, 0.18); /* Thin gold transparent border */
   --color-brand-bg: #0A0A0A; /* Matte Black background */
   --color-brand-surface: #121212; /* Charcoal Black surface */
   --color-brand-surface-muted: #1E1E1E; /* Dark Graphite surface */
-  --color-brand-text: #F5F5F5; /* Soft pure white body text */
-  --color-brand-text-muted: #9E9E9E; /* Soft gray muted text */
+  --color-brand-text: #F8F8F8; /* Crisp pure white body text for dark contrast */
+  --color-brand-text-muted: #A3A3A3; /* Elevated high-contrast soft gray */
   --color-brand-gold-dark: #C5A880; /* Gold for highlight states */
   --color-brand-gold-light: #1A1612; /* Dark luxury gold-charcoal */
   
-  --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-serif: "Manrope", system-ui, -apple-system, sans-serif;
+  --font-sans: "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-heading: "Manrope", system-ui, -apple-system, sans-serif;
+  --font-body: "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-manrope: "Manrope", system-ui, -apple-system, sans-serif;
+  --font-dm: "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-logo: "Playfair Display", Georgia, serif;
   --font-mono: "JetBrains Mono", monospace;
   
   /* Ease curves */
@@ -28,6 +33,7 @@
     background-color: var(--color-brand-bg);
     color: var(--color-brand-text);
     font-family: var(--font-sans);
+    font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
@@ -35,9 +41,19 @@
   }
   
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-serif);
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    font-family: var(--font-sans);
     font-weight: 400;
-    letter-spacing: -0.01em;
+    letter-spacing: 0.005em;
+  }
+
+  button, input, textarea, select, label {
+    font-family: var(--font-sans);
   }
 }
 

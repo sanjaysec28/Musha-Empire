@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, SlidersHorizontal, Clock, ArrowUpDown, ChevronRight, Sparkles, Star, Tag, Award, Shield, Gem, Compass, Heart, Check } from 'lucide-react';
 import { EXTENDED_SERVICES_DATA, CATEGORIES_LIST, ExtendedService } from '../../data/servicesExtendedData';
+import { servicesRepository } from '../../lib/firestoreService';
 import Card from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import Button from '../ui/Button';
@@ -31,20 +32,60 @@ export default function ServicesPage({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [sortBy, setSortBy] = useState<string>('recommended');
+  const [dbServices, setDbServices] = useState<ExtendedService[] | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    servicesRepository.getActiveServices().then((records) => {
+      if (isMounted && records && records.length > 0) {
+        const mapped: ExtendedService[] = records.map((s) => {
+          const durationVal = s.duration_minutes || s.durationMinutes || 45;
+          const priceNum = typeof s.price === 'number' ? s.price : Number(String(s.price).replace(/[^\d.]/g, '')) || 65;
+          return {
+            id: s.id,
+            name: s.name,
+            category: s.category,
+            price: `$${priceNum}`,
+            priceValue: priceNum,
+            duration: `${durationVal} mins`,
+            durationValue: durationVal,
+            shortDescription: s.shortDescription || s.description?.slice(0, 120) || '',
+            longDescription: s.description || '',
+            benefits: s.benefits || [],
+            includedServices: s.includedServices || [],
+            image: s.image_url || s.imageUrl || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80',
+            popular: s.popular || false,
+            rating: s.rating || 4.9,
+            reviewsCount: s.reviewsCount || 120,
+            faqs: [],
+          };
+        });
+        setDbServices(mapped);
+      } else {
+        setDbServices([]);
+      }
+    }).catch(err => {
+      console.warn('Notice reading services repository in ServicesPage:', err);
+      if (isMounted) setDbServices([]);
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  const allServices = dbServices !== null ? dbServices : EXTENDED_SERVICES_DATA;
 
   // Find recently viewed services
   const recentlyViewedServices = useMemo(() => {
-    return EXTENDED_SERVICES_DATA.filter((s) => recentlyViewedIds.includes(s.id));
-  }, [recentlyViewedIds]);
+    return allServices.filter((s) => recentlyViewedIds.includes(s.id));
+  }, [allServices, recentlyViewedIds]);
 
   // Recommended services (popular services)
   const recommendedServices = useMemo(() => {
-    return EXTENDED_SERVICES_DATA.filter((s) => s.popular).slice(0, 3);
-  }, []);
+    return allServices.filter((s) => s.popular).slice(0, 3);
+  }, [allServices]);
 
   // Filter and sort services
   const filteredAndSortedServices = useMemo(() => {
-    let result = [...EXTENDED_SERVICES_DATA];
+    let result = [...allServices];
 
     // 1. Recipient category filter
     if (selectedRecipientCategory) {
@@ -131,7 +172,7 @@ export default function ServicesPage({
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-4xl md:text-5xl lg:text-6xl font-serif font-light tracking-tight text-brand-primary leading-none"
+            className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold tracking-tight text-brand-primary leading-none"
           >
             Bespoke <span className="font-serif-italic text-brand-secondary">Aesthetic</span> Experiences
           </motion.h1>
@@ -140,7 +181,7 @@ export default function ServicesPage({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="max-w-2xl mx-auto font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-light"
+            className="max-w-2xl mx-auto font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-normal"
           >
             Explore our curated selection of fine grooming, coloring, and therapeutic skin wellness treatments. Each ritual begins with an individual scalp-mapping or dermal-diagnostic consultation.
           </motion.p>
@@ -164,7 +205,7 @@ export default function ServicesPage({
                 <span className="font-sans text-[9px] uppercase tracking-widest font-semibold text-brand-secondary bg-brand-secondary/15 px-2 py-0.5">Special Offer</span>
                 <span className="font-mono text-[9px] text-brand-text-muted">Limited Time</span>
               </div>
-              <h3 className="font-serif text-lg text-brand-primary font-medium">The Sovereign Welcome Gift</h3>
+              <h3 className="font-serif text-lg text-brand-primary font-bold">The Sovereign Welcome Gift</h3>
               <p className="font-sans text-xs text-brand-text-muted leading-relaxed max-w-xl">
                 Indulge in any service above $80 and enjoy a complimentary **Signature Scalp Wash & Blowout** with premium Oribe oils. Apply code <span className="font-mono font-semibold text-brand-secondary">ROYAL15</span> during checkout.
               </p>
@@ -200,11 +241,11 @@ export default function ServicesPage({
             transition={{ duration: 0.6 }}
             className="space-y-3 mb-12"
           >
-            <h2 className="text-2xl md:text-3xl font-serif font-light tracking-[0.2em] text-brand-primary uppercase">
+            <h2 className="text-2xl md:text-3xl font-serif font-bold tracking-[0.2em] text-brand-primary uppercase">
               WHO IS THE SERVICE FOR?
             </h2>
             <div className="h-[1px] w-12 bg-brand-secondary mx-auto" />
-            <p className="max-w-2xl mx-auto font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-light">
+            <p className="max-w-2xl mx-auto font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-normal">
               Choose your category to discover a personalized collection of premium salon experiences.
             </p>
           </motion.div>
@@ -305,7 +346,7 @@ export default function ServicesPage({
                   </div>
 
                   {/* Description */}
-                  <p className="font-sans text-[11px] text-brand-text-muted leading-relaxed font-light mt-3">
+                  <p className="font-sans text-[11px] text-brand-text-muted leading-relaxed font-normal mt-3">
                     {rec.desc}
                   </p>
 
@@ -342,10 +383,10 @@ export default function ServicesPage({
               </div>
               
               <div className="space-y-2 relative z-10 text-center flex flex-col items-center">
-                <h3 className="font-serif text-xl tracking-widest text-brand-primary uppercase">
+                <h3 className="font-serif text-xl font-bold tracking-widest text-brand-primary uppercase">
                   Discover Your Personalized Ritual
                 </h3>
-                <p className="font-sans text-xs text-brand-text-muted max-w-md mx-auto leading-relaxed font-light">
+                <p className="font-sans text-xs text-brand-text-muted max-w-md mx-auto leading-relaxed font-normal">
                   Please select a recipient category above to unlock our bespoke collection of luxury salon experiences, tailored specifically for you.
                 </p>
               </div>
@@ -365,7 +406,7 @@ export default function ServicesPage({
                 <span className="font-mono text-[9px] uppercase tracking-widest text-brand-secondary block mb-1">
                   Bespoke Selection
                 </span>
-                <h2 className="text-2xl md:text-3.5xl font-serif text-brand-primary font-light tracking-wide uppercase">
+                <h2 className="text-2xl md:text-3.5xl font-serif text-brand-primary font-bold tracking-wide uppercase">
                   {selectedRecipientCategory === 'Men' && 'Premium Care For Men'}
                   {selectedRecipientCategory === 'Women' && 'Luxury Experiences For Women'}
                   {(selectedRecipientCategory === 'Boy' || selectedRecipientCategory === 'Girl') && 'Royal Kids Collection'}
@@ -572,7 +613,7 @@ export default function ServicesPage({
                                 <span>{service.rating} ({service.reviewsCount} reviews)</span>
                               </div>
 
-                              <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-light line-clamp-2 font-light">
+                              <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal line-clamp-2">
                                 {service.shortDescription}
                               </p>
 
@@ -613,23 +654,35 @@ export default function ServicesPage({
                 </div>
               ) : (
                 <div id="no-services-found-box" className="py-16 text-center border border-dashed border-brand-secondary/20 bg-brand-surface p-8">
-                  <Search className="h-10 w-10 text-brand-text-muted mx-auto mb-3" />
-                  <h4 className="font-serif text-lg text-brand-primary">No Matching Rituals</h4>
-                  <p className="font-sans text-xs text-brand-text-muted mt-1 max-w-sm mx-auto">
-                    We couldn't find any services matching "{searchQuery}". Try selecting a different department or using different keywords.
-                  </p>
-                  <Button
-                    id="clear-filters-btn"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setSelectedCategory('All');
-                    }}
-                    className="mt-4"
-                  >
-                    Reset Search & Filters
-                  </Button>
+                  {allServices.length === 0 ? (
+                    <>
+                      <Sparkles className="h-10 w-10 text-brand-secondary/60 mx-auto mb-3" />
+                      <h4 className="font-serif text-lg text-brand-primary font-bold">No services available yet</h4>
+                      <p className="font-sans text-xs text-brand-text-muted mt-1 max-w-sm mx-auto">
+                        Our service catalog is currently being synchronized with salon records. Please check back shortly or consult our concierge desk.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-10 w-10 text-brand-text-muted mx-auto mb-3" />
+                      <h4 className="font-serif text-lg text-brand-primary font-bold">No Matching Rituals</h4>
+                      <p className="font-sans text-xs text-brand-text-muted mt-1 max-w-sm mx-auto">
+                        We couldn't find any services matching "{searchQuery}". Try selecting a different department or using different keywords.
+                      </p>
+                      <Button
+                        id="clear-filters-btn"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSelectedCategory('All');
+                        }}
+                        className="mt-4"
+                      >
+                        Reset Search & Filters
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
             </motion.div>
@@ -642,7 +695,7 @@ export default function ServicesPage({
         <section id="recently-viewed-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-20 border-t border-brand-secondary/15 pt-16 text-left">
           <div className="mb-8">
             <span className="font-sans text-[10px] uppercase tracking-widest text-brand-secondary block mb-1">Your Journey</span>
-            <h2 className="text-2xl md:text-3xl font-serif text-brand-primary font-light">Recently Viewed Rituals</h2>
+            <h2 className="text-2xl md:text-3xl font-serif text-brand-primary font-bold">Recently Viewed Rituals</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {recentlyViewedServices.map((service) => (
@@ -658,7 +711,7 @@ export default function ServicesPage({
                 <div className="p-4 space-y-3 flex-1 flex flex-col justify-between text-left">
                   <div className="space-y-1">
                     <span className="text-[9px] uppercase tracking-widest font-mono text-brand-secondary">{service.category}</span>
-                    <h4 className="font-serif text-sm font-medium text-brand-primary line-clamp-1">{service.name}</h4>
+                    <h4 className="font-serif text-sm font-semibold text-brand-primary line-clamp-1">{service.name}</h4>
                     <div className="flex justify-between items-center text-xs font-mono text-brand-text-muted">
                       <span>{service.price}</span>
                       <span>{service.duration}</span>
@@ -685,7 +738,7 @@ export default function ServicesPage({
         <div className="mb-8 flex justify-between items-end">
           <div>
             <span className="font-sans text-[10px] uppercase tracking-widest text-brand-secondary block mb-1">Our Recommendations</span>
-            <h2 className="text-2xl md:text-3xl font-serif text-brand-primary font-light">Highly Curated Masterpieces</h2>
+            <h2 className="text-2xl md:text-3xl font-serif text-brand-primary font-bold">Highly Curated Masterpieces</h2>
           </div>
           <Button
             id="view-all-recommended-btn"
@@ -714,7 +767,7 @@ export default function ServicesPage({
               <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
                 <div className="space-y-1">
                   <h4 className="font-serif text-base font-semibold text-brand-primary">{service.name}</h4>
-                  <p className="font-sans text-xs text-brand-text-muted font-light line-clamp-2">{service.shortDescription}</p>
+                  <p className="font-sans text-xs text-brand-text-muted font-normal line-clamp-2">{service.shortDescription}</p>
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-brand-secondary/15">
                   <span className="font-serif text-base text-brand-gold-dark font-bold">{service.price}</span>
@@ -743,11 +796,11 @@ export default function ServicesPage({
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-brand-secondary/15 border border-brand-secondary/30 text-brand-secondary text-[9px] uppercase tracking-widest font-semibold">
               <Award className="h-3.5 w-3.5" /> Royal Club Privilege
             </span>
-            <h2 className="text-3xl md:text-4xl font-serif font-light tracking-tight leading-tight">
+            <h2 className="text-3xl md:text-4xl font-serif font-bold tracking-tight leading-tight">
               Unlock Priority VIP Access & <br />
               <span className="font-serif-italic text-brand-secondary">Bespoke Complimentary Treatments</span>
             </h2>
-            <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-light">
+            <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-normal">
               Become a privileged member of Musha Empire’s Royal Club. Enjoy a stable 15% discount across all services, same-day scheduling priority, and dedicated luxury lounge amenities.
             </p>
           </div>

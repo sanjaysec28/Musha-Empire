@@ -40,7 +40,7 @@ export default function Accordion({
             <button
               id={`${id}-trigger-${item.id}`}
               onClick={() => toggleItem(item.id)}
-              className="w-full py-4 flex items-center justify-between text-left font-sans font-medium text-brand-primary uppercase tracking-wider text-sm hover:text-brand-secondary transition-colors focus:outline-none cursor-pointer"
+              className="w-full py-4 flex items-center justify-between text-left font-sans font-semibold text-brand-primary uppercase tracking-wider text-sm hover:text-brand-secondary transition-colors focus:outline-none cursor-pointer"
               aria-expanded={isOpen}
             >
               <span id={`${id}-title-${item.id}`}>{item.title}</span>

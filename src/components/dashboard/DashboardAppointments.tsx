@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Calendar,
@@ -24,6 +24,10 @@ import {
 import { DashboardAppointment } from './types';
 import Button from '../ui/Button';
 import { Modal } from '../ui/Overlay';
+import { settingsRepository } from '../../lib/firestoreService';
+import { FirestoreSalonSettings } from '../../types/firestore';
+import { useAuth } from '../../contexts/AuthContext';
+import { callCancelBooking, callRescheduleBooking, mapBookingError } from '../../lib/firebaseFunctions';
 
 interface DashboardAppointmentsProps {
   id: string;
@@ -53,6 +57,17 @@ export default function DashboardAppointments({
   // Reschedule form inputs
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
+  const [salonSettings, setSalonSettings] = useState<FirestoreSalonSettings | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    settingsRepository.getSalonSettings().then((s) => {
+      if (isMounted && s) setSalonSettings(s);
+    }).catch(err => {
+      console.warn('Notice reading salon settings in DashboardAppointments:', err);
+    });
+    return () => { isMounted = false; };
+  }, []);
 
   // Extract list of stylists for filtering
   const stylists = Array.from(new Set(appointments.map((app) => app.stylistName)));
@@ -95,19 +110,34 @@ export default function DashboardAppointments({
     );
   };
 
-  const handleConfirmCancel = () => {
-    if (activeCancelConfirm) {
+  const { user } = useAuth();
+  const [isActionLoading, setIsActionLoading] = useState(false);
+
+  const handleConfirmCancel = async () => {
+    if (!activeCancelConfirm) return;
+    setIsActionLoading(true);
+    try {
+      if (user?.id || (user as any)?.uid) {
+        await callCancelBooking(
+          { bookingId: activeCancelConfirm.id },
+          (user as any)?.uid || user.id
+        );
+      }
       onCancelAppointment(activeCancelConfirm.id);
       triggerToast(
         'warning',
         'Appointment Released',
-        `Your booking ${activeCancelConfirm.id} has been cancelled. Refund credits are added back to your wallet.`
+        `Your booking ${activeCancelConfirm.id} has been cancelled. Associated slots have been released.`
       );
       setActiveCancelConfirm(null);
+    } catch (err: any) {
+      triggerToast('error', 'Cancellation Error', mapBookingError(err));
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
-  const handleConfirmRescheduleSubmit = (e: React.FormEvent) => {
+  const handleConfirmRescheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDate || !newTime) {
       triggerToast('error', 'Missing Information', 'Please select a valid date and available hour slot.');
@@ -115,28 +145,84 @@ export default function DashboardAppointments({
     }
 
     if (activeReschedule) {
-      onRescheduleAppointment(activeReschedule.id, newDate, newTime);
-      triggerToast(
-        'success',
-        'Reservation Adjusted',
-        `Treatment ${activeReschedule.serviceName} is rescheduled to ${newDate} at ${newTime}.`
-      );
-      setActiveReschedule(null);
-      setNewDate('');
-      setNewTime('');
+      setIsActionLoading(true);
+      try {
+        if (user?.id || (user as any)?.uid) {
+          await callRescheduleBooking(
+            {
+              bookingId: activeReschedule.id,
+              bookingDate: newDate,
+              startTime: newTime
+            },
+            (user as any)?.uid || user.id
+          );
+        }
+        onRescheduleAppointment(activeReschedule.id, newDate, newTime);
+        triggerToast(
+          'success',
+          'Reservation Adjusted',
+          `Treatment ${activeReschedule.serviceName} is rescheduled to ${newDate} at ${newTime}.`
+        );
+        setActiveReschedule(null);
+        setNewDate('');
+        setNewTime('');
+      } catch (err: any) {
+        triggerToast('error', 'Reschedule Error', mapBookingError(err));
+      } finally {
+        setIsActionLoading(false);
+      }
     }
   };
 
-  const timeSlots = [
-    '09:00 AM',
-    '10:30 AM',
-    '12:00 PM',
-    '01:30 PM',
-    '03:00 PM',
-    '04:30 PM',
-    '06:00 PM',
-    '07:30 PM',
-  ];
+  const timeSlots = useMemo(() => {
+    if (!salonSettings) return [];
+    const hoursList = (salonSettings.opening_hours && Array.isArray(salonSettings.opening_hours))
+      ? salonSettings.opening_hours
+      : (salonSettings.openingHours && Array.isArray(salonSettings.openingHours))
+      ? salonSettings.openingHours
+      : null;
+    if (!hoursList || hoursList.length === 0) return [];
+
+    let targetDay = null;
+    if (newDate) {
+      const dayName = new Date(newDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+      targetDay = hoursList.find(h => h.day.toLowerCase() === dayName.toLowerCase());
+    } else {
+      targetDay = hoursList.find(h => !h.isClosed && h.open && h.close);
+    }
+
+    if (!targetDay || targetDay.isClosed || !targetDay.open || !targetDay.close) return [];
+
+    const parseTimeToMin = (tStr: string) => {
+      const match = tStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (!match) return null;
+      let h = parseInt(match[1]);
+      const m = parseInt(match[2]);
+      const ampm = match[3]?.toUpperCase();
+      if (ampm === 'PM' && h < 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
+    };
+
+    const formatMin = (min: number) => {
+      const h24 = Math.floor(min / 60);
+      const m = min % 60;
+      const ampm = h24 >= 12 ? 'PM' : 'AM';
+      let h12 = h24 % 12;
+      if (h12 === 0) h12 = 12;
+      return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+    };
+
+    const oMin = parseTimeToMin(targetDay.open);
+    const cMin = parseTimeToMin(targetDay.close);
+    if (oMin === null || cMin === null || cMin <= oMin) return [];
+
+    const slots: string[] = [];
+    for (let m = oMin; m < cMin; m += 30) {
+      slots.push(formatMin(m));
+    }
+    return slots;
+  }, [salonSettings, newDate]);
 
   return (
     <div id={id} className="space-y-6">
@@ -553,26 +639,32 @@ export default function DashboardAppointments({
               <span className="font-sans text-xs uppercase tracking-wider font-medium text-brand-text mb-2.5 block">
                 Select Available Hour
               </span>
-              <div className="grid grid-cols-2 xs:grid-cols-4 gap-2">
-                {timeSlots.map((slot) => {
-                  const isSelected = slot === newTime;
-                  return (
-                    <button
-                      key={slot}
-                      type="button"
-                      id={`reschedule-time-slot-${slot.replace(/\s+/g, '-').toLowerCase()}`}
-                      onClick={() => setNewTime(slot)}
-                      className={`py-2.5 px-2 border text-center font-sans text-xs transition-all duration-300 cursor-pointer ${
-                        isSelected
-                          ? 'border-brand-secondary bg-brand-gold-light text-brand-gold-dark font-bold'
-                          : 'border-brand-accent hover:border-brand-secondary bg-brand-surface text-brand-text'
-                      }`}
-                    >
-                      {slot}
-                    </button>
-                  );
-                })}
-              </div>
+              {timeSlots.length === 0 ? (
+                <p className="font-sans text-xs text-brand-text-muted italic py-2">
+                  Availability unavailable
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 xs:grid-cols-4 gap-2">
+                  {timeSlots.map((slot) => {
+                    const isSelected = slot === newTime;
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        id={`reschedule-time-slot-${slot.replace(/\s+/g, '-').toLowerCase()}`}
+                        onClick={() => setNewTime(slot)}
+                        className={`py-2.5 px-2 border text-center font-sans text-xs transition-all duration-300 cursor-pointer ${
+                          isSelected
+                            ? 'border-brand-secondary bg-brand-gold-light text-brand-gold-dark font-bold'
+                            : 'border-brand-accent hover:border-brand-secondary bg-brand-surface text-brand-text'
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 justify-end pt-3">

@@ -71,7 +71,7 @@ export default function CookieConsent({
           </div>
 
           {/* Description */}
-          <p className="font-sans text-[11px] text-brand-text-muted leading-relaxed font-light">
+          <p className="font-sans text-[11px] text-brand-text-muted leading-relaxed font-normal">
             We employ client-side caching (local storage cookies) to optimize your booking experience and customize your design tokens. No personal profiling or external database telemetry tracking is executed.
           </p>
 

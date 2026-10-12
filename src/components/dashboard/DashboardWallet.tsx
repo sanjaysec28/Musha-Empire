@@ -68,7 +68,7 @@ export default function DashboardWallet({
     }
 
     if (customAmount && (!cardNumber || !cardExpiry || !cardCVC)) {
-      triggerToast('error', 'Billing Details Required', 'Please fill out your mock secure credit card credentials.');
+      triggerToast('error', 'Billing Details Required', 'Please fill out your credit card billing credentials.');
       return;
     }
 
@@ -326,10 +326,10 @@ export default function DashboardWallet({
             )}
           </div>
 
-          {/* Mock Secure Billing Details */}
+          {/* Secure Billing Details */}
           <div className="border-t border-brand-accent pt-4 space-y-3">
             <span className="font-sans text-xs uppercase tracking-wider font-semibold text-brand-text flex items-center gap-1.5">
-              <CreditCard className="h-4 w-4 text-brand-secondary" /> Mock Secure Checkout
+              <CreditCard className="h-4 w-4 text-brand-secondary" /> Secure Checkout
             </span>
 
             <input
@@ -404,7 +404,7 @@ export default function DashboardWallet({
           <div>
             <p className="font-serif text-base font-semibold text-brand-primary">Claim Promotional Code</p>
             <p className="font-sans text-xs text-brand-text-muted max-w-xs mx-auto mt-1">
-              Input verified VIP coupon cards or concierge codes to claim free deposits. Try <strong className="text-brand-primary font-bold">VIPEMPIRE</strong> for a mock $25.
+              Input verified VIP coupon cards or concierge codes to claim salon credit deposits.
             </p>
           </div>
 

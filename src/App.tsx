@@ -7,6 +7,9 @@ import { useState, useEffect } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { isFirebaseConfigured } from './lib/firebase';
+import { bookingsRepository } from './lib/firestoreService';
+import { callCancelBooking } from './lib/firebaseFunctions';
 import { EXTENDED_SERVICES_DATA } from './data/servicesExtendedData';
 import { STYLISTS_DATA } from './data/salonData';
 
@@ -89,7 +92,7 @@ export default function App() {
     }
   }, [recentlyViewedIds]);
 
-  // Load appointments from Supabase when user changes or is set (polled for live dashboard/portal alignment)
+  // Load appointments from Firestore / Supabase when user changes
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -97,21 +100,78 @@ export default function App() {
       return;
     }
 
-    if (!isSupabaseConfigured) {
-      try {
-        const saved = localStorage.getItem(`musha_appointments_${user.id}`);
-        if (saved) {
-          setAppointments(JSON.parse(saved));
-        }
-      } catch (e) {
-        console.warn('Local appointments restore error:', e);
-      }
-      return;
-    }
-
     let isMounted = true;
 
     const fetchUserBookings = async () => {
+      // 1. Try Firestore first if configured
+      if (isFirebaseConfigured) {
+        try {
+          const fbBookings = await bookingsRepository.getMyBookings(user.id);
+          if (isMounted) {
+            if (fbBookings && fbBookings.length > 0) {
+              const mapped: BookingRecord[] = fbBookings.map((b) => {
+                const localService = EXTENDED_SERVICES_DATA.find(s => s.id === b.service_id || s.name.toLowerCase() === (b.service_name || '').toLowerCase());
+                const durationMin = b.duration_minutes || localService?.durationValue || 60;
+                const priceVal = b.price || localService?.priceValue || 95;
+
+                return {
+                  id: b.id,
+                  service: {
+                    id: b.service_id || 'service-1',
+                    name: b.service_name || localService?.name || 'Sanctuary Ritual',
+                    category: localService?.category || 'Exclusive',
+                    price: `$${priceVal}`,
+                    priceValue: priceVal,
+                    duration: `${durationMin} Mins`,
+                    durationValue: durationMin,
+                    shortDescription: localService?.shortDescription || '',
+                    longDescription: localService?.longDescription || '',
+                    image: localService?.image || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80',
+                    benefits: localService?.benefits || [],
+                    includedServices: localService?.includedServices || [],
+                    popular: localService?.popular || false,
+                    rating: localService?.rating || 4.9,
+                    reviewsCount: localService?.reviewsCount || 12,
+                    faqs: localService?.faqs || []
+                  },
+                  gender: b.gender,
+                  date: b.booking_date,
+                  timeSlot: b.start_time,
+                  endTime: b.end_time,
+                  totalAmount: b.price,
+                  discountApplied: b.discountApplied || 0,
+                  promoApplied: b.promoCodeApplied || '',
+                  createdAt: b.created_at || new Date().toLocaleDateString(),
+                  ticketCode: b.ticket_code,
+                  customerName: user.displayName || 'Valued Patron',
+                  stylist: null
+                };
+              });
+              setAppointments(mapped);
+            } else {
+              setAppointments([]);
+            }
+            return;
+          }
+        } catch (fbErr) {
+          console.warn('Notice reading user bookings from Firestore:', fbErr);
+        }
+      }
+
+      if (!isSupabaseConfigured) {
+        try {
+          const saved = localStorage.getItem(`musha_appointments_${user.id}`);
+          if (saved && isMounted) {
+            setAppointments(JSON.parse(saved));
+            return;
+          }
+        } catch (e) {
+          console.warn('Local appointments restore error:', e);
+        }
+        if (isMounted) setAppointments([]);
+        return;
+      }
+
       try {
         const { data: dbBookings, error: bErr } = await supabase
           .from('bookings')
@@ -166,20 +226,21 @@ export default function App() {
           };
 
           const mappedStylist = {
-            id: b.staff_id || 'stylist-1',
-            name: stylist?.full_name || localStylist?.name || 'Arthur Pendragon',
-            role: stylist?.role === 'stylist' ? 'Master Stylist' : (stylist?.role || localStylist?.role || 'Master Artisan'),
-            experience: localStylist?.experience || '10+ Years Experience',
-            specialty: stylist?.specialty || localStylist?.specialty || 'Luxury Artistry',
-            bio: stylist?.bio || localStylist?.bio || 'Elite artisan.',
-            image: stylist?.image_url || localStylist?.image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-            instagram: localStylist?.instagram || '@musha_empire'
+            id: b.staff_id || 'stylist-concierge',
+            name: stylist?.full_name || 'Salon Concierge',
+            role: stylist?.role === 'stylist' ? 'Master Stylist' : (stylist?.role || 'Master Artisan'),
+            experience: 'Certified Artisan',
+            specialty: stylist?.specialty || 'Luxury Artistry',
+            bio: stylist?.bio || 'Certified salon artisan.',
+            image: stylist?.image_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+            instagram: '@musha_empire'
           };
 
           return {
             id: b.id,
             service: mappedService,
             stylist: mappedStylist,
+            gender: b.gender || 'Other',
             date: b.booking_date,
             timeSlot: b.start_time,
             totalAmount: b.total_amount,
@@ -265,9 +326,17 @@ export default function App() {
     );
   };
 
-  // Cancel reservation slot directly in Supabase database!
+  // Cancel reservation slot via trusted Cloud Function
   const handleCancelAppointment = async (id: string) => {
     try {
+      if (isFirebaseConfigured && user) {
+        try {
+          await callCancelBooking({ bookingId: id }, user.id);
+        } catch (err: any) {
+          console.warn('Notice cancelling via Cloud Function in App.tsx:', err);
+        }
+      }
+
       if (isSupabaseConfigured) {
         const { error } = await supabase
           .from('bookings')

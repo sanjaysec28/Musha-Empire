@@ -40,7 +40,7 @@ export default function NotFoundPage({
       <span className="font-sans text-[10px] sm:text-xs uppercase tracking-[0.35em] font-semibold text-brand-secondary block mb-3">
         Error Code: 404 &bull; Symmetry Lost
       </span>
-      <h1 className="font-serif text-4xl sm:text-5xl text-brand-primary font-light tracking-tight max-w-xl mx-auto leading-tight">
+      <h1 className="font-serif text-4xl sm:text-5xl text-brand-primary font-bold tracking-tight max-w-xl mx-auto leading-tight">
         The Reflection has <span className="font-serif-italic text-brand-gold-dark italic">Shattered</span>
       </h1>
       <div className="luxury-divider my-6 max-w-xs mx-auto" />

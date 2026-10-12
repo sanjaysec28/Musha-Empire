@@ -35,6 +35,9 @@ import {
   UserAddress
 } from './types';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { isFirebaseConfigured, auth } from '../../lib/firebase';
+import { bookingsRepository } from '../../lib/firestoreService';
+import { callCancelBooking } from '../../lib/firebaseFunctions';
 import { EXTENDED_SERVICES_DATA } from '../../data/servicesExtendedData';
 import { STYLISTS_DATA } from '../../data/salonData';
 
@@ -57,101 +60,32 @@ interface DashboardModuleProps {
 }
 
 // ==============================================
-// SEED CONSTANTS FOR PRIVATE PORTAL
+// INITIAL CLEAN DEFAULTS FOR PRIVATE PORTAL
 // ==============================================
 const DEFAULT_USER: DashboardUser = {
-  id: 'USR-89012-NY',
-  name: 'Sanjay Kumar',
-  email: 'sanjaykumar4747pc@gmail.com',
-  phone: '+1 (555) 019-2834',
-  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
-  walletBalance: 325.50,
-  loyaltyPoints: 1450,
-  membershipPlan: 'Silver',
-  membershipRenewalDate: 'Jul 30, 2026',
-  addresses: [
-    { id: 'addr-1', title: 'Manhattan Penthouse', street: '512 Park Avenue, Suite 12A', city: 'New York', state: 'NY', zipCode: '10021' },
-    { id: 'addr-2', title: 'Hamptons Villa', street: '14 Bayberry Lane', city: 'East Hampton', state: 'NY', zipCode: '11937' }
-  ],
+  id: '',
+  name: 'Valued Patron',
+  email: '',
+  phone: '',
+  avatar: '',
+  walletBalance: 0,
+  loyaltyPoints: 0,
+  membershipPlan: 'None',
+  membershipRenewalDate: 'Not active',
+  addresses: [],
   preferences: {
     language: 'en',
     theme: 'light',
-    newsletter: true,
+    newsletter: false,
     appointmentReminders: true,
-    smsNotifications: true
+    smsNotifications: false
   }
 };
 
-const DEFAULT_APPOINTMENTS: DashboardAppointment[] = [
-  {
-    id: 'MSH-89102-VX',
-    serviceId: 'hair-cut-1',
-    serviceName: 'Master Haircut & Styling',
-    category: 'Styling',
-    stylistName: 'Viktor Vance',
-    stylistAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100',
-    date: '2026-07-04',
-    timeSlot: '02:30 PM',
-    price: 95.00,
-    duration: '45 mins',
-    status: 'upcoming',
-    paymentStatus: 'paid',
-    qrCodeUrl: '#qr-code-placeholder',
-    invoiceUrl: '#invoice-download'
-  },
-  {
-    id: 'MSH-78192-ER',
-    serviceId: 'skin-facial-1',
-    serviceName: 'Imperial Glow facial Therapy',
-    category: 'Facial',
-    stylistName: 'Elena Rostova',
-    stylistAvatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=100',
-    date: '2026-06-25',
-    timeSlot: '11:00 AM',
-    price: 150.00,
-    duration: '60 mins',
-    status: 'completed',
-    paymentStatus: 'paid',
-    qrCodeUrl: '#qr-code-placeholder',
-    invoiceUrl: '#invoice-download'
-  },
-  {
-    id: 'MSH-67123-MB',
-    serviceId: 'grooming-beard-1',
-    serviceName: 'Classic Beard Sculpting & Massage',
-    category: 'Grooming',
-    stylistName: 'Marcus Brodie',
-    stylistAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=100',
-    date: '2026-06-12',
-    timeSlot: '04:30 PM',
-    price: 60.00,
-    duration: '35 mins',
-    status: 'cancelled',
-    paymentStatus: 'refunded',
-    qrCodeUrl: '#qr-code-placeholder',
-    invoiceUrl: '#invoice-download'
-  }
-];
-
-const DEFAULT_TRANSACTIONS: WalletTransaction[] = [
-  { id: 'TX-90182', amount: 95.00, type: 'debit', description: 'Pre-payment: Haircut & Royal Styling', date: 'Jun 28, 2026', status: 'success' },
-  { id: 'TX-89102', amount: 150.00, type: 'credit', description: 'Deposited funds via Visa Card (***4242)', date: 'Jun 25, 2026', status: 'success' },
-  { id: 'TX-78123', amount: 15.00, type: 'credit', description: 'Loyalty points top-up reward credit', date: 'Jun 15, 2026', status: 'success' },
-  { id: 'TX-67102', amount: 60.00, type: 'credit', description: 'Refund: Classic Beard Sculpt (Cancelled)', date: 'Jun 12, 2026', status: 'success' }
-];
-
-const DEFAULT_REWARDS: LoyaltyRewardItem[] = [
-  { id: 'RWD-01', title: 'Bespoke Hot Stone Scalp massage', description: 'Add a deeply relaxing 20-minute hot basalt stone scalp loop to any haircut package.', pointsCost: 400, category: 'Scalp Care', iconName: 'Scalp' },
-  { id: 'RWD-02', title: 'Signature Imperial Hair Spa upgrade', description: 'Nourish hair roots with steam mist loops and luxury natural botanical butter formulas.', pointsCost: 650, category: 'Hair Treatment', iconName: 'Spa' },
-  { id: 'RWD-03', title: 'Privilege Beard Grooming & Cologne Spray', description: 'Sculpt sideburns with precise line grooming and premium bespoke sandalwood cologne splashes.', pointsCost: 350, category: 'Grooming', iconName: 'Beard' },
-  { id: 'RWD-04', title: 'Sovereign Hydrating facial Therapy', description: 'Deep cell exfoliation with organic luxury gold-infused micro-scrub masks.', pointsCost: 1200, category: 'Facial', iconName: 'Facial' }
-];
-
-const DEFAULT_NOTIFICATIONS: DashboardNotification[] = [
-  { id: 'NTF-1', title: 'Prepayment Confirmed', description: 'We verified your $95.00 transaction for Haircut & Styling on Jul 4. Your priority lounge ticket is generated.', timestamp: '2 hours ago', isRead: false, type: 'wallet' },
-  { id: 'NTF-2', title: 'Welcome to the Privilege Circle', description: 'Your private salon digital manager is active. Manage pre-fundings, claim gift vouchers, or book master artists.', timestamp: '1 day ago', isRead: true, type: 'general' },
-  { id: 'NTF-3', title: 'Congratulations! Level Up to Gold Tier', description: 'Your loyalty achievements crossed 1,000 pts. You are now a Gold Elite patron, unlocking quarterly spa perks.', timestamp: '2 weeks ago', isRead: true, type: 'reward' }
-];
+const DEFAULT_APPOINTMENTS: DashboardAppointment[] = [];
+const DEFAULT_TRANSACTIONS: WalletTransaction[] = [];
+const DEFAULT_REWARDS: LoyaltyRewardItem[] = [];
+const DEFAULT_NOTIFICATIONS: DashboardNotification[] = [];
 
 export default function DashboardModule({ id, onLogout, triggerToast, userProfile }: DashboardModuleProps) {
   const [currentView, setCurrentView] = useState<DashboardViewType>('overview');
@@ -508,11 +442,50 @@ export default function DashboardModule({ id, onLogout, triggerToast, userProfil
     fetchSupabaseProfileAndData();
   }, [userProfile, refreshTrigger]);
 
-  // Synchronize appointments with live Supabase database
+  // Synchronize appointments with live Firestore / Supabase database
   useEffect(() => {
     let isMounted = true;
     
-    const fetchSupabaseBookings = async () => {
+    const fetchBookings = async () => {
+      // 1. Authoritative Firestore sync
+      if (isFirebaseConfigured && auth?.currentUser) {
+        try {
+          const fbBookings = await bookingsRepository.getMyBookings(auth.currentUser.uid);
+          if (isMounted) {
+            if (fbBookings && fbBookings.length > 0) {
+              const mapped: DashboardAppointment[] = fbBookings.map((b) => {
+                const localService = EXTENDED_SERVICES_DATA.find(s => s.id === b.service_id || s.name.toLowerCase() === (b.service_name || '').toLowerCase());
+                const duration = b.duration_minutes ? `${b.duration_minutes} Mins` : localService?.duration || '60 Mins';
+                const price = b.price || localService?.priceValue || 95;
+                return {
+                  id: b.id,
+                  serviceId: b.service_id || 'service-1',
+                  serviceName: b.service_name || localService?.name || 'Sanctuary Ritual',
+                  category: localService?.category || 'Exclusive',
+                  stylistName: 'Salon Concierge',
+                  stylistAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100',
+                  date: b.booking_date,
+                  timeSlot: b.start_time,
+                  price,
+                  duration,
+                  status: b.status === 'cancelled' ? 'cancelled' : (b.status === 'completed' ? 'completed' : 'upcoming'),
+                  paymentStatus: b.payment_status === 'paid' ? 'paid' : (b.status === 'cancelled' ? 'refunded' : 'pending'),
+                  qrCodeUrl: '#qr-code-placeholder',
+                  invoiceUrl: '#invoice-download',
+                  realStatus: b.status as any
+                };
+              });
+              setAppointments(mapped);
+            } else {
+              setAppointments([]);
+            }
+            return;
+          }
+        } catch (err) {
+          console.warn('Notice reading bookings from Firestore in dashboard:', err);
+        }
+      }
+
       if (!isSupabaseConfigured) return;
       try {
         const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -556,9 +529,8 @@ export default function DashboardModule({ id, onLogout, triggerToast, userProfil
 
           // Find stylist
           const stylist = staffList.find((s) => s.id === b.staff_id);
-          const localStylist = STYLISTS_DATA.find(s => s.id === b.staff_id || s.name.toLowerCase() === stylist?.full_name?.toLowerCase());
-          const stylistName = stylist?.full_name || localStylist?.name || 'Arthur Pendragon';
-          const stylistAvatar = stylist?.image_url || localStylist?.image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100';
+          const stylistName = stylist?.full_name || 'Salon Concierge';
+          const stylistAvatar = stylist?.image_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100';
 
           return {
             id: b.id,
@@ -587,10 +559,10 @@ export default function DashboardModule({ id, onLogout, triggerToast, userProfil
       }
     };
 
-    fetchSupabaseBookings();
+    fetchBookings();
 
-    // Set up rapid polling interval for instant booking display synchronization
-    const interval = setInterval(fetchSupabaseBookings, 5000);
+    // Set up polling interval for instant booking display synchronization
+    const interval = setInterval(fetchBookings, 8000);
 
     return () => {
       isMounted = false;
@@ -694,6 +666,14 @@ export default function DashboardModule({ id, onLogout, triggerToast, userProfil
       type: 'wallet'
     };
     setNotifications((prev) => [newNotif, ...prev]);
+
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await callCancelBooking({ bookingId: appId }, auth.currentUser.uid);
+      } catch (fbErr) {
+        console.warn('Notice cancelling booking in Firebase:', fbErr);
+      }
+    }
 
     if (!isSupabaseConfigured) return;
 

@@ -37,7 +37,7 @@ export function SuccessState({
       </div>
 
       <div className="space-y-2">
-        <h3 id={`${id}-title`} className="font-serif text-2xl md:text-3xl text-brand-primary font-light">
+        <h3 id={`${id}-title`} className="font-serif text-2xl md:text-3xl text-brand-primary font-bold">
           {title}
         </h3>
         <p id={`${id}-desc`} className="font-sans text-xs sm:text-sm text-brand-text-muted max-w-md leading-relaxed">
@@ -82,7 +82,7 @@ export function ErrorState({
       </div>
 
       <div className="space-y-2">
-        <h3 id={`${id}-title`} className="font-serif text-2xl md:text-3xl text-brand-primary font-light">
+        <h3 id={`${id}-title`} className="font-serif text-2xl md:text-3xl text-brand-primary font-bold">
           {title}
         </h3>
         <p id={`${id}-desc`} className="font-sans text-xs sm:text-sm text-brand-text-muted max-w-md leading-relaxed">

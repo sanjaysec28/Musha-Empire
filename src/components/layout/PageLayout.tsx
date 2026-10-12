@@ -48,7 +48,7 @@ export default function PageLayout({
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className={`flex-grow relative z-10 ${isPortal ? 'pt-0' : 'pt-24'}`}
+        className={`flex-grow relative z-10 ${isPortal || currentView === 'home' ? 'pt-0' : 'pt-20 sm:pt-24'}`}
       >
         {children}
       </motion.main>

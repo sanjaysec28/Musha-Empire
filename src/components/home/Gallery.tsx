@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GALLERY_DATA, GalleryItem } from '../../data/salonData';
+import { GalleryItem } from '../../data/salonData';
+import { galleryRepository } from '../../lib/firestoreService';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { Eye, X, ZoomIn, Heart, Share2, Sparkles } from 'lucide-react';
@@ -17,6 +18,34 @@ export interface GalleryProps {
 export default function Gallery({ onViewAll }: GalleryProps = {}) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [likes, setLikes] = useState<Record<string, boolean>>({});
+  const [firestoreGallery, setFirestoreGallery] = useState<GalleryItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    galleryRepository.getActiveGallery().then((records) => {
+      if (!isMounted) return;
+      if (records && records.length > 0) {
+        const mapped: GalleryItem[] = records.map((g) => ({
+          id: g.id,
+          title: g.title,
+          category: g.category,
+          image: g.image_url || g.imageUrl || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80',
+        }));
+        setFirestoreGallery(mapped);
+      } else {
+        setFirestoreGallery([]);
+      }
+    }).catch(err => {
+      console.warn('Notice reading gallery from Firestore:', err);
+      if (isMounted) setFirestoreGallery([]);
+    }).finally(() => {
+      if (isMounted) setLoading(false);
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  const galleryItems = firestoreGallery;
 
   const handleToggleLike = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -29,14 +58,14 @@ export default function Gallery({ onViewAll }: GalleryProps = {}) {
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (lightboxIndex !== null) {
-      setLightboxIndex((lightboxIndex + 1) % GALLERY_DATA.length);
+      setLightboxIndex((lightboxIndex + 1) % galleryItems.length);
     }
   };
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (lightboxIndex !== null) {
-      setLightboxIndex((lightboxIndex - 1 + GALLERY_DATA.length) % GALLERY_DATA.length);
+      setLightboxIndex((lightboxIndex - 1 + galleryItems.length) % galleryItems.length);
     }
   };
 
@@ -49,75 +78,90 @@ export default function Gallery({ onViewAll }: GalleryProps = {}) {
           <span className="font-sans text-[11px] uppercase tracking-[0.3em] font-semibold text-brand-secondary block">
             VISUAL PORTFOLIO OF MASTERPIECES
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-light text-brand-primary">
-            The Musha <span className="italic font-medium">Aesthetic Gallery</span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-brand-primary">
+            The Musha <span className="italic font-bold text-gold-gradient">Aesthetic Gallery</span>
           </h2>
           <div className="luxury-divider" />
-          <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-light">
-            An unretouched chronicle of recent bespoke transformations and styling sessions conducted inside our Mayfair lounge. Click any artwork to view details and zoom.
+          <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-normal">
+            An unretouched chronicle of recent bespoke transformations and styling sessions conducted inside our salon suites. Click any artwork to view details and zoom.
           </p>
         </div>
 
         {/* Gallery Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {GALLERY_DATA.map((item, index) => (
-            <motion.div
-              key={item.id}
-              id={`gallery-wrapper-${item.id}`}
-              initial={{ opacity: 0, y: 15 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-40px' }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="group cursor-pointer relative"
-              onClick={() => setLightboxIndex(index)}
-            >
-              {/* Image Frame */}
-              <Card
-                id={`gallery-card-${item.id}`}
-                variant="bordered"
-                className="p-0 border-brand-secondary/15 bg-brand-surface overflow-hidden aspect-square flex flex-col justify-between"
+        {loading ? (
+          <div className="py-20 text-center space-y-4">
+            <div className="h-8 w-8 border-2 border-brand-secondary/30 border-t-brand-secondary rounded-full animate-spin mx-auto" />
+            <p className="font-sans text-xs uppercase tracking-widest text-brand-secondary">Loading Aesthetic Portfolio...</p>
+          </div>
+        ) : galleryItems.length === 0 ? (
+          <div className="py-20 text-center border border-dashed border-brand-secondary/20 p-8 bg-brand-surface/40 space-y-3 max-w-xl mx-auto">
+            <Sparkles className="h-8 w-8 text-brand-secondary/60 mx-auto" />
+            <h3 className="font-serif text-xl font-bold text-brand-primary">No gallery items available yet</h3>
+            <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal">
+              Our aesthetic transformation gallery is currently being curated with recent salon session photography.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {galleryItems.map((item, index) => (
+              <motion.div
+                key={item.id}
+                id={`gallery-wrapper-${item.id}`}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="group cursor-pointer relative"
+                onClick={() => setLightboxIndex(index)}
               >
-                <div className="relative w-full h-full bg-[#121212] overflow-hidden">
-                  <img
-                    src={item.image}
-                    alt={item.title}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover opacity-90 transition-transform duration-700 ease-out group-hover:scale-105 group-hover:opacity-80"
-                  />
-                  
-                  {/* Subtle hover overlay with controls */}
-                  <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-6 text-left">
-                    <div className="flex justify-between items-center">
-                      <span className="font-mono text-[9px] uppercase tracking-widest text-brand-secondary bg-brand-bg/80 border border-brand-secondary/35 px-2.5 py-1 backdrop-blur-sm">
-                        {item.category}
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          id={`gallery-like-btn-${item.id}`}
-                          onClick={(e) => handleToggleLike(item.id, e)}
-                          className={`h-8 w-8 rounded-none border flex items-center justify-center transition-all bg-brand-surface/30 ${
-                            likes[item.id]
-                              ? 'border-red-500/50 text-red-500 bg-red-500/10'
-                              : 'border-brand-secondary/20 text-brand-primary hover:border-brand-secondary'
-                          }`}
-                        >
-                          <Heart className={`h-4 w-4 ${likes[item.id] ? 'fill-current' : ''}`} />
-                        </button>
+                {/* Image Frame */}
+                <Card
+                  id={`gallery-card-${item.id}`}
+                  variant="bordered"
+                  className="p-0 border-brand-secondary/15 bg-brand-surface overflow-hidden aspect-square flex flex-col justify-between"
+                >
+                  <div className="relative w-full h-full bg-[#121212] overflow-hidden">
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover opacity-90 transition-transform duration-700 ease-out group-hover:scale-105 group-hover:opacity-80"
+                    />
+                    
+                    {/* Subtle hover overlay with controls */}
+                    <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-6 text-left">
+                      <div className="flex justify-between items-center">
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-brand-secondary bg-brand-bg/80 border border-brand-secondary/35 px-2.5 py-1 backdrop-blur-sm">
+                          {item.category}
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            id={`gallery-like-btn-${item.id}`}
+                            onClick={(e) => handleToggleLike(item.id, e)}
+                            className={`h-8 w-8 rounded-none border flex items-center justify-center transition-all bg-brand-surface/30 ${
+                              likes[item.id]
+                                ? 'border-red-500/50 text-red-500 bg-red-500/10'
+                                : 'border-brand-secondary/20 text-brand-primary hover:border-brand-secondary'
+                            }`}
+                          >
+                            <Heart className={`h-4 w-4 ${likes[item.id] ? 'fill-current' : ''}`} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                        <h4 className="font-serif text-lg text-brand-primary font-bold leading-tight">{item.title}</h4>
+                        <p className="font-sans text-[10px] text-brand-secondary uppercase tracking-widest font-bold flex items-center gap-1.5">
+                          <ZoomIn className="h-3.5 w-3.5" /> Tap To Zoom Frame
+                        </p>
                       </div>
                     </div>
-
-                    <div className="space-y-1.5 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                      <h4 className="font-serif text-lg text-brand-primary font-light leading-tight">{item.title}</h4>
-                      <p className="font-sans text-[10px] text-brand-secondary uppercase tracking-widest font-bold flex items-center gap-1.5">
-                        <ZoomIn className="h-3.5 w-3.5" /> Tap To Zoom Frame
-                      </p>
-                    </div>
                   </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* View All CTA Row */}
         <div className="text-center mt-12">
@@ -181,8 +225,8 @@ export default function Gallery({ onViewAll }: GalleryProps = {}) {
                 >
                   <div className="relative aspect-square md:aspect-[4/3] max-h-[65vh] w-full bg-[#121212]/30 border border-brand-secondary/15 p-2 flex items-center justify-center">
                     <img
-                      src={GALLERY_DATA[lightboxIndex].image}
-                      alt={GALLERY_DATA[lightboxIndex].title}
+                      src={galleryItems[lightboxIndex].image}
+                      alt={galleryItems[lightboxIndex].title}
                       referrerPolicy="no-referrer"
                       className="max-h-full max-w-full object-contain"
                     />
@@ -191,9 +235,9 @@ export default function Gallery({ onViewAll }: GalleryProps = {}) {
                   {/* Footnote details */}
                   <div className="w-full text-center mt-4 space-y-1.5 max-w-lg">
                     <span className="font-mono text-[9px] uppercase tracking-widest text-brand-secondary bg-brand-secondary/10 px-2 py-0.5 border border-brand-secondary/20 inline-block">
-                      {GALLERY_DATA[lightboxIndex].category}
+                      {galleryItems[lightboxIndex].category}
                     </span>
-                    <h3 className="font-serif text-xl md:text-2xl text-brand-primary font-light">{GALLERY_DATA[lightboxIndex].title}</h3>
+                    <h3 className="font-serif text-xl md:text-2xl text-brand-primary font-bold">{galleryItems[lightboxIndex].title}</h3>
                     <p className="font-sans text-xs text-brand-text-muted/60">
                       Photography from the main suite — Artistry by Master Arthur and Team.
                     </p>

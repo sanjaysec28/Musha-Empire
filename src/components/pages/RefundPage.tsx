@@ -13,7 +13,7 @@ export default function RefundPage() {
         <span className="font-sans text-[10px] uppercase tracking-[0.25em] font-semibold text-brand-secondary block mb-2">
           Concierge Fairness
         </span>
-        <h1 className="font-serif text-3xl sm:text-4xl text-brand-primary font-light">
+        <h1 className="font-serif text-3xl sm:text-4xl text-brand-primary font-bold">
           Cancellation & Refund Policy
         </h1>
         <div className="flex items-center gap-2 mt-4 text-[10px] font-mono text-brand-text-muted uppercase tracking-wider">

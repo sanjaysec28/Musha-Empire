@@ -259,16 +259,18 @@ export default function MushaEmpireLogo({
 
   if (variant === 'horizontal') {
     return (
-      <div className={`flex items-center gap-3 select-none transition-all duration-300 ease-out hover:scale-[1.03] hover:drop-shadow-[0_0_12px_rgba(197,168,128,0.45)] cursor-pointer ${className}`}>
-        {/* Emblem - Scaled perfectly to fit in 40px navbar vertical height */}
-        <Emblem size={44} />
+      <div className={`flex items-center gap-2 sm:gap-3 select-none transition-all duration-300 ease-out hover:scale-[1.02] cursor-pointer shrink-0 ${className}`}>
+        {/* Emblem - Scaled with preserveAspectRatio for mobile navbar */}
+        <div className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 flex items-center justify-center">
+          <Emblem size={40} />
+        </div>
 
         {/* Typography */}
-        <div className={`flex flex-col text-left ${classNameText}`}>
-          <span className="font-serif text-base sm:text-lg md:text-xl font-bold tracking-[0.05em] text-white leading-none">
+        <div className={`flex flex-col text-left justify-center ${classNameText}`}>
+          <span className="font-logo text-sm sm:text-base md:text-lg lg:text-xl font-bold tracking-[0.04em] text-white leading-none whitespace-nowrap">
             MUSHA EMPIRE
           </span>
-          <span className="text-[7.5px] sm:text-[8px] uppercase tracking-[0.38em] font-sans font-semibold text-brand-secondary mt-1 leading-none whitespace-nowrap">
+          <span className="text-[6.5px] sm:text-[7.5px] md:text-[8px] uppercase tracking-[0.22em] sm:tracking-[0.32em] font-sans font-semibold text-brand-secondary mt-1 leading-none whitespace-nowrap">
             LUXURY UNISEX SALON & SPA
           </span>
         </div>
@@ -284,7 +286,7 @@ export default function MushaEmpireLogo({
 
       {/* Bold Serif Typography */}
       <div className={`flex flex-col mt-4 space-y-1 ${classNameText}`}>
-        <span className="font-serif text-2xl sm:text-3xl font-medium tracking-[0.08em] text-white">
+        <span className="font-logo text-2xl sm:text-3xl font-medium tracking-[0.08em] text-white">
           MUSHA EMPIRE
         </span>
         <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.45em] font-sans font-bold text-brand-secondary">

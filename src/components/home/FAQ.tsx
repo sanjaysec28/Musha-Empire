@@ -23,11 +23,11 @@ export default function FAQ() {
           <span className="font-sans text-[11px] uppercase tracking-[0.3em] font-semibold text-brand-secondary flex items-center justify-center gap-1.5">
             <HelpCircle className="h-4 w-4" /> SANCTUARY FREQUENT ENQUIRIES
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-light text-brand-primary">
-            Frequently Asked <span className="italic font-medium">Questions</span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-brand-primary">
+            Frequently Asked <span className="italic font-bold text-gold-gradient">Questions</span>
           </h2>
           <div className="luxury-divider" />
-          <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-light max-w-xl mx-auto">
+          <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-normal max-w-xl mx-auto">
             Review detailed guidelines on our bookings, cancellations, product compounds, and private suite arrangements before scheduling your attendance.
           </p>
         </div>
@@ -44,7 +44,7 @@ export default function FAQ() {
 
         {/* Bottom Note */}
         <p className="text-[11px] text-brand-text-muted font-sans text-center mt-8 uppercase tracking-widest leading-relaxed">
-          Have an unlisted custom request? Contact our premium Mayfair lounge desk at <a href="tel:+442079460923" className="text-brand-gold-dark font-semibold hover:underline">+44 (20) 7946 0923</a>
+          Have an unlisted custom request? Inquire via our private salon concierge desk or customer portal.
         </p>
 
       </div>

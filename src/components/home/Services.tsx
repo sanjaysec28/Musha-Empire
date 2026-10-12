@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { SERVICES_DATA, ServiceItem } from '../../data/salonData';
+import { ServiceItem } from '../../data/salonData';
+import { servicesRepository } from '../../lib/firestoreService';
 import Card from '../ui/Card';
 import { Chip } from '../ui/Badge';
 import Button from '../ui/Button';
@@ -21,6 +22,38 @@ export default function Services({ onBookService, onExploreAll }: ServicesProps)
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeService, setActiveService] = useState<ServiceItem | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState<boolean>(false);
+  const [firestoreServices, setFirestoreServices] = useState<ServiceItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    servicesRepository.getActiveServices().then((dbServices) => {
+      if (!isMounted) return;
+      if (dbServices && dbServices.length > 0) {
+        const mapped: ServiceItem[] = dbServices.map((s) => ({
+          id: s.id,
+          title: s.name,
+          category: (s.category?.toLowerCase().includes('skin') ? 'skin' :
+                     s.category?.toLowerCase().includes('groom') ? 'grooming' :
+                     s.category?.toLowerCase().includes('exclus') ? 'exclusive' : 'hair') as any,
+          price: typeof s.price === 'number' ? `$${s.price}` : String(s.price),
+          duration: `${s.duration_minutes || s.durationMinutes || 45} mins`,
+          description: s.description || '',
+          image: s.image_url || s.imageUrl || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80',
+          features: s.benefits || s.includedServices || [],
+        }));
+        setFirestoreServices(mapped);
+      } else {
+        setFirestoreServices([]);
+      }
+    }).catch(err => {
+      console.warn('Notice reading services from Firestore repository:', err);
+      if (isMounted) setFirestoreServices([]);
+    }).finally(() => {
+      if (isMounted) setLoading(false);
+    });
+    return () => { isMounted = false; };
+  }, []);
 
   const categories = [
     { id: 'all', label: 'All Services' },
@@ -30,9 +63,10 @@ export default function Services({ onBookService, onExploreAll }: ServicesProps)
     { id: 'exclusive', label: 'Signature Suites' }
   ];
 
+  const currentSource = firestoreServices;
   const filteredServices = selectedCategory === 'all'
-    ? SERVICES_DATA
-    : SERVICES_DATA.filter(service => service.category === selectedCategory);
+    ? currentSource
+    : currentSource.filter(service => service.category === selectedCategory);
 
   const handleBookService = (service: ServiceItem) => {
     if (onBookService) {
@@ -71,11 +105,11 @@ export default function Services({ onBookService, onExploreAll }: ServicesProps)
           <span className="font-sans text-[11px] uppercase tracking-[0.3em] font-semibold text-brand-secondary block">
             THE CATALOG OF MASTERWORKS
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-light text-brand-primary">
-            Our Premium <span className="italic font-medium">Bespoke Offerings</span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-brand-primary">
+            Our Premium <span className="italic font-bold text-gold-gradient">Bespoke Offerings</span>
           </h2>
           <div className="luxury-divider" />
-          <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-light">
+          <p className="font-sans text-xs md:text-sm text-brand-text-muted leading-relaxed font-normal">
             Every ritual is conducted by certified master stylists. We consult deeply, using only elite organic botanical elixirs, in a private space curated for you.
           </p>
         </div>
@@ -95,80 +129,95 @@ export default function Services({ onBookService, onExploreAll }: ServicesProps)
         </div>
 
         {/* Services Grid with Framer Motion AnimatePresence */}
-        <motion.div
-          layout
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
-        >
-          <AnimatePresence mode="popLayout">
-            {filteredServices.map((service, idx) => (
-              <motion.div
-                layout
-                key={service.id}
-                id={`service-card-wrapper-${service.id}`}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-                className="flex flex-col h-full"
-              >
-                <Card
-                  id={`service-card-${service.id}`}
-                  variant="bordered"
-                  hoverable
-                  className="flex flex-col h-full p-0 overflow-hidden bg-brand-surface border-brand-accent/40"
+        {loading ? (
+          <div className="py-20 text-center space-y-4">
+            <div className="h-8 w-8 border-2 border-brand-secondary/30 border-t-brand-secondary rounded-full animate-spin mx-auto" />
+            <p className="font-sans text-xs uppercase tracking-widest text-brand-secondary">Curating Salon Services...</p>
+          </div>
+        ) : filteredServices.length === 0 ? (
+          <div className="py-20 text-center border border-dashed border-brand-secondary/20 p-8 bg-brand-surface/40 space-y-3 max-w-xl mx-auto">
+            <Sparkles className="h-8 w-8 text-brand-secondary/60 mx-auto" />
+            <h3 className="font-serif text-xl font-bold text-brand-primary">No services available yet</h3>
+            <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal">
+              Our active masterwork catalog for this category is currently being updated in salon records. Please select another category or check back shortly.
+            </p>
+          </div>
+        ) : (
+          <motion.div
+            layout
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
+          >
+            <AnimatePresence mode="popLayout">
+              {filteredServices.map((service, idx) => (
+                <motion.div
+                  layout
+                  key={service.id}
+                  id={`service-card-wrapper-${service.id}`}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex flex-col h-full"
                 >
-                  {/* Service Image banner */}
-                  <div className="relative w-full aspect-[16/10] overflow-hidden bg-brand-primary">
-                    <img
-                      src={service.image}
-                      alt={service.title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover opacity-90 hover:scale-105 transition-transform duration-700 ease-out"
-                    />
-                    <div className="absolute top-4 right-4 bg-brand-bg/85 backdrop-blur-md border border-brand-secondary/35 text-brand-secondary text-xs uppercase font-sans tracking-widest px-3 py-1 font-semibold">
-                      {service.price}
-                    </div>
-                  </div>
-
-                  {/* Service Contents */}
-                  <div className="p-6 md:p-8 flex-1 flex flex-col justify-between space-y-6">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-4 text-[10px] font-sans text-brand-secondary uppercase tracking-widest font-semibold">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5" /> {service.duration}
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Tag className="h-3 w-3" /> {service.category === 'hair' ? 'Hair' : service.category === 'skin' ? 'Skin' : service.category === 'grooming' ? 'Grooming' : 'Exclusive'}
-                        </span>
+                  <Card
+                    id={`service-card-${service.id}`}
+                    variant="bordered"
+                    hoverable
+                    className="flex flex-col h-full p-0 overflow-hidden bg-brand-surface border-brand-accent/40"
+                  >
+                    {/* Service Image banner */}
+                    <div className="relative w-full aspect-[16/10] overflow-hidden bg-brand-primary">
+                      <img
+                        src={service.image}
+                        alt={service.title}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover opacity-90 hover:scale-105 transition-transform duration-700 ease-out"
+                      />
+                      <div className="absolute top-4 right-4 bg-brand-bg/85 backdrop-blur-md border border-brand-secondary/35 text-brand-secondary text-xs uppercase font-sans tracking-widest px-3 py-1 font-semibold">
+                        {service.price}
                       </div>
-                      <h3 className="font-serif text-lg md:text-xl font-light text-brand-primary leading-snug group-hover:text-brand-secondary transition-colors">
-                        {service.title}
-                      </h3>
-                      <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-light line-clamp-3">
-                        {service.description}
-                      </p>
                     </div>
 
-                    <div className="pt-2">
-                      <Button
-                        id={`service-book-btn-${service.id}`}
-                        variant="link"
-                        size="sm"
-                        rightIcon={<ArrowRight className="h-3.5 w-3.5" />}
-                        onClick={() => handleBookService(service)}
-                        className="w-full flex justify-between items-center group/btn text-[10px] tracking-widest font-semibold font-sans uppercase text-brand-gold-dark"
-                      >
-                        Book Ritual
-                      </Button>
+                    {/* Service Contents */}
+                    <div className="p-6 md:p-8 flex-1 flex flex-col justify-between space-y-6">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4 text-[10px] font-sans text-brand-secondary uppercase tracking-widest font-semibold">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" /> {service.duration}
+                          </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <Tag className="h-3 w-3" /> {service.category === 'hair' ? 'Hair' : service.category === 'skin' ? 'Skin' : service.category === 'grooming' ? 'Grooming' : 'Exclusive'}
+                          </span>
+                        </div>
+                        <h3 className="font-serif text-lg md:text-xl font-bold text-brand-primary leading-snug group-hover:text-brand-secondary transition-colors">
+                          {service.title}
+                        </h3>
+                        <p className="font-sans text-xs text-brand-text-muted leading-relaxed font-normal line-clamp-3">
+                          {service.description}
+                        </p>
+                      </div>
+
+                      <div className="pt-2">
+                        <Button
+                          id={`service-book-btn-${service.id}`}
+                          variant="link"
+                          size="sm"
+                          rightIcon={<ArrowRight className="h-3.5 w-3.5" />}
+                          onClick={() => handleBookService(service)}
+                          className="w-full flex justify-between items-center group/btn text-[10px] tracking-widest font-bold font-sans uppercase text-brand-gold-dark"
+                        >
+                          Book Ritual
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
 
         {/* Full Catalog Button */}
         {onExploreAll && (

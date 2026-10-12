@@ -17,9 +17,9 @@ export default function CustomerPortal({ id, triggerToast, onNavigateHome }: Cus
   const { user, loading, logout: authLogout } = useAuth();
 
   const sessionUser = {
-    name: user?.user_metadata?.name || user?.email?.split('@')[0] || 'Royal Patron',
+    name: user?.displayName || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Royal Patron',
     email: user?.email || '',
-    phone: user?.user_metadata?.phone || '',
+    phone: user?.phoneNumber || user?.phone || user?.user_metadata?.phone || '',
   };
 
   const handleAuthSuccess = (userData: { name: string; email: string; phone: string }) => {

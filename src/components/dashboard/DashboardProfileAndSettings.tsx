@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   User,
@@ -22,6 +22,8 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { DashboardUser, UserAddress } from './types';
+import { settingsRepository } from '../../lib/firestoreService';
+import { FirestoreSalonSettings } from '../../types/firestore';
 import Button from '../ui/Button';
 import { Input } from '../ui/InputFields';
 import { Modal } from '../ui/Overlay';
@@ -50,6 +52,21 @@ export default function DashboardProfileAndSettings({
   const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone);
   const [isLoading, setIsLoading] = useState(false);
+  const [salonSettings, setSalonSettings] = useState<FirestoreSalonSettings | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    settingsRepository.getSalonSettings().then((s) => {
+      if (isMounted && s) setSalonSettings(s);
+    }).catch(err => {
+      console.warn('Notice reading salon settings in DashboardProfileAndSettings:', err);
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  const addressPlaceholder = salonSettings?.address
+    ? (typeof salonSettings.address === 'object' ? `${salonSettings.address.line1}` : salonSettings.address)
+    : 'Address unavailable';
 
   // Address creation states
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -142,10 +159,9 @@ export default function DashboardProfileAndSettings({
     triggerToast('success', 'Preferences Updated', 'Your dashboard configurations have been synchronized.');
   };
 
-  const handleMockAvatarClick = () => {
-    triggerToast('info', 'Secure Image Service', 'Connecting mock encrypted cloud bucket. Selected new profile asset...');
+  const handleAvatarUpdateClick = () => {
+    triggerToast('info', 'Secure Image Service', 'Connecting secure storage service. Selecting new portrait asset...');
     
-    // Mock updating avatar with standard premium asset
     setTimeout(() => {
       onUpdateUser({
         avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'
@@ -204,7 +220,7 @@ export default function DashboardProfileAndSettings({
                 <button
                   id="avatar-upload-icon-trigger"
                   type="button"
-                  onClick={handleMockAvatarClick}
+                  onClick={handleAvatarUpdateClick}
                   className="absolute inset-0 bg-[#121212]/90 text-brand-secondary flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer"
                   title="Upload profile picture"
                 >
@@ -267,7 +283,8 @@ export default function DashboardProfileAndSettings({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   leftIcon={<Phone className="h-4 w-4 text-brand-text-muted" />}
-                  required
+                  disabled={true}
+                  helperText="Authoritative mobile identity verified via phone authentication."
                 />
 
                 <div className="flex justify-end pt-2">
@@ -572,7 +589,7 @@ export default function DashboardProfileAndSettings({
             id="addr-input-street"
             type="text"
             label="Street Address Line 1"
-            placeholder="Mayfair Boulevard, Suite 500"
+            placeholder={addressPlaceholder}
             value={addrStreet}
             onChange={(e) => setAddrStreet(e.target.value)}
             required
@@ -584,7 +601,7 @@ export default function DashboardProfileAndSettings({
                 id="addr-input-city"
                 type="text"
                 label="City"
-                placeholder="New York"
+                placeholder="City"
                 value={addrCity}
                 onChange={(e) => setAddrCity(e.target.value)}
                 required
@@ -595,7 +612,7 @@ export default function DashboardProfileAndSettings({
                 id="addr-input-state"
                 type="text"
                 label="State"
-                placeholder="NY"
+                placeholder="State / Region"
                 value={addrState}
                 onChange={(e) => setAddrState(e.target.value)}
                 required

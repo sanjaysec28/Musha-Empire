@@ -101,7 +101,7 @@ export default function MembershipPage({
         <span className="font-sans text-[10px] sm:text-xs uppercase tracking-[0.3em] font-semibold text-brand-secondary block mb-3">
           The Royal Club
         </span>
-        <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl text-brand-primary font-light tracking-tight">
+        <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl text-brand-primary font-bold tracking-tight">
           Elite <span className="font-serif-italic text-brand-gold-dark italic">Privilege Memberships</span>
         </h1>
         <div className="luxury-divider my-6" />
@@ -167,7 +167,7 @@ export default function MembershipPage({
                     {plan.tier === 'silver' && <ShieldCheck className="h-5 w-5 text-brand-text-muted" />}
                     {plan.tier === 'gold' && <Award className="h-5 w-5 text-brand-secondary" />}
                     {plan.tier === 'platinum' && <Crown className="h-5 w-5 text-brand-gold-dark" />}
-                    <h3 className="font-serif text-2xl text-brand-primary font-light">
+                    <h3 className="font-serif text-2xl text-brand-primary font-bold">
                       {plan.name}
                     </h3>
                   </div>
@@ -178,7 +178,7 @@ export default function MembershipPage({
 
                 {/* Price Display */}
                 <div className="flex items-baseline text-brand-primary">
-                  <span className="font-serif text-4xl sm:text-5xl font-light">£{currentPrice}</span>
+                  <span className="font-serif text-4xl sm:text-5xl font-bold">£{currentPrice}</span>
                   <span className="font-sans text-xs text-brand-text-muted ml-1">{priceLabel}</span>
                 </div>
 
@@ -215,7 +215,7 @@ export default function MembershipPage({
       {/* Comparison Table Section */}
       <section id="membership-comparison" className="border border-brand-accent/25 bg-brand-surface overflow-hidden">
         <div className="p-6 md:p-8 border-b border-brand-accent/20 bg-brand-surface-muted/30">
-          <h2 className="font-serif text-2xl text-brand-primary font-light">
+          <h2 className="font-serif text-2xl text-brand-primary font-bold">
             Privilege Tier Comparison
           </h2>
           <p className="font-sans text-xs text-brand-text-muted mt-1">

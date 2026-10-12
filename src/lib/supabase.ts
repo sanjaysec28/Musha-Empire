@@ -15,12 +15,9 @@ const supabaseAnonKey = isSupabaseConfigured
   ? import.meta.env.VITE_SUPABASE_ANON_KEY
   : 'placeholder-anon-key';
 
-if (!isSupabaseConfigured) {
-  // Graceful notification in development/demo mode without triggering console errors
-  console.info(
-    'Musha Empire: Running in offline/demo mode with built-in catalog data. (Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for live database sync).'
-  );
-}
+// Approved backend for Musha Empire is Firebase Authentication and Cloud Firestore.
+// Supabase remains in dormant standby mode without emitting unconfigured warnings.
+
 
 // Custom safe fetch that intercepts network calls if Supabase is unconfigured,
 // avoiding "TypeError: Failed to fetch" browser errors.

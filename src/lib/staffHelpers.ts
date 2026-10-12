@@ -7,7 +7,7 @@ export interface StaffMetadata {
   bioText: string;
   schedule: {
     workingDays: string[]; // ['Monday', 'Tuesday', ...]
-    startTime: string;     // '09:00'
+    startTime: string;     // e.g. '10:00'
     endTime: string;       // '18:00'
     lunchBreak: string;    // '13:00-14:00'
     weeklyOff: string[];   // ['Saturday', 'Sunday']
@@ -25,10 +25,10 @@ export function parseStaffBio(bio: string | null): StaffMetadata {
     bioText: bio || '',
     schedule: {
       workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-      startTime: '09:00',
-      endTime: '18:00',
-      lunchBreak: '13:00-14:00',
-      weeklyOff: ['Saturday', 'Sunday']
+      startTime: '',
+      endTime: '',
+      lunchBreak: '',
+      weeklyOff: []
     },
     leaves: []
   };
@@ -115,12 +115,14 @@ export function isStaffWorking(staffMeta: StaffMetadata, dateStr: string, timeSt
   // 3. If timeStr is provided, check if it falls within working hours and NOT during lunch break
   if (timeStr) {
     const timeVal = parseTimeToMinutes(timeStr);
-    const startVal = parseTimeToMinutes(staffMeta.schedule?.startTime || '09:00');
-    const endVal = parseTimeToMinutes(staffMeta.schedule?.endTime || '18:00');
+    const startVal = staffMeta.schedule?.startTime ? parseTimeToMinutes(staffMeta.schedule.startTime) : null;
+    const endVal = staffMeta.schedule?.endTime ? parseTimeToMinutes(staffMeta.schedule.endTime) : null;
     
     // Check main working hours range
-    if (timeVal < startVal || timeVal >= endVal) {
-      return false;
+    if (startVal !== null && endVal !== null) {
+      if (timeVal < startVal || timeVal >= endVal) {
+        return false;
+      }
     }
     
     // Check lunch break

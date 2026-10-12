@@ -14,7 +14,7 @@ export default function Breadcrumb({ items, id }: BreadcrumbProps) {
           return (
             <li key={index} id={`${id}-item-${index}`} className="inline-flex items-center">
               {index > 0 && (
-                <span id={`${id}-item-${index}-separator`} className="mx-2 text-brand-text-muted text-sm font-light select-none">
+                <span id={`${id}-item-${index}-separator`} className="mx-2 text-brand-text-muted text-sm font-normal select-none">
                   /
                 </span>
               )}

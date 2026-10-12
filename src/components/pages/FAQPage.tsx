@@ -114,7 +114,7 @@ export default function FAQPage({
         <span className="font-sans text-[10px] sm:text-xs uppercase tracking-[0.3em] font-semibold text-brand-secondary block mb-3">
           Atelier Knowledge Base
         </span>
-        <h1 className="font-serif text-4xl sm:text-5xl text-brand-primary font-light tracking-tight">
+        <h1 className="font-serif text-4xl sm:text-5xl text-brand-primary font-bold tracking-tight">
           Frequently Asked <span className="font-serif-italic text-brand-gold-dark italic">Inquiries</span>
         </h1>
         <div className="luxury-divider my-6" />
@@ -173,7 +173,7 @@ export default function FAQPage({
                   onClick={() => handleToggle(faq.id)}
                   className="w-full p-5 sm:p-6 text-left flex items-start justify-between gap-4 cursor-pointer focus:outline-none"
                 >
-                  <h3 className="font-serif text-lg sm:text-xl text-brand-primary font-light pr-4 leading-tight">
+                  <h3 className="font-serif text-lg sm:text-xl text-brand-primary font-bold pr-4 leading-tight">
                     {faq.question}
                   </h3>
                   <span className="text-brand-secondary shrink-0 mt-1 bg-brand-surface-muted/50 p-1 border border-brand-accent/10">
@@ -203,7 +203,7 @@ export default function FAQPage({
         ) : (
           <div className="text-center p-12 bg-brand-surface border border-brand-accent/25">
             <HelpCircle className="h-10 w-10 text-brand-secondary mx-auto mb-4" />
-            <p className="font-serif text-xl text-brand-primary font-light">No queries matched your search</p>
+            <p className="font-serif text-xl text-brand-primary font-bold">No queries matched your search</p>
             <p className="font-sans text-xs text-brand-text-muted mt-2">Try searching using simpler keywords or select another tab category above.</p>
           </div>
         )}
@@ -211,7 +211,7 @@ export default function FAQPage({
 
       {/* Further Help Section */}
       <section id="faq-cta" className="mt-20 p-8 bg-brand-surface-muted/40 border border-brand-accent/20 text-center space-y-4">
-        <h3 className="font-serif text-xl text-brand-primary font-medium flex items-center justify-center gap-2">
+        <h3 className="font-serif text-xl text-brand-primary font-bold flex items-center justify-center gap-2">
           <MessageSquare className="h-5 w-5 text-brand-secondary" /> Still Have Unanswered Questions?
         </h3>
         <p className="font-sans text-xs text-brand-text-muted leading-relaxed max-w-md mx-auto">

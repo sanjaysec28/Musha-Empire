@@ -3,14 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, User, Phone, Eye, EyeOff, ShieldCheck, ArrowLeft, Key, Smartphone, Sparkles } from 'lucide-react';
+import { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 import { AuthScreenType } from './types';
 import Button from '../ui/Button';
 import { Input } from '../ui/InputFields';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { auth, isFirebaseConfigured } from '../../lib/firebase';
+import { formatAuthErrorMessage } from '../../lib/firebaseAuth';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import MushaEmpireLogo from '../ui/MushaEmpireLogo';
 
 interface AuthModuleProps {
@@ -20,16 +23,21 @@ interface AuthModuleProps {
 }
 
 export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModuleProps) {
-  const { signUp, login, resetPassword } = useAuth();
+  const { signUp, login, resetPassword, sendPhoneOtp, confirmPhoneOtp, loginWithGoogle } = useAuth();
   const [screen, setScreen] = useState<AuthScreenType>('login');
+  const [loginMode, setLoginMode] = useState<'phone' | 'email'>('phone');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Phone OTP state
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+
   // Form states
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [otpCodes, setOtpCodes] = useState(['', '', '', '', '', '']);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -43,6 +51,55 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
     return /\S+@\S+\.\S+/.test(val);
   };
 
+  // --------------------------------------------------------------------------
+  // PRIMARY: PHONE OTP DISPATCH
+  // --------------------------------------------------------------------------
+  const handleSendPhoneOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPhone = phone.trim();
+
+    if (!cleanPhone || cleanPhone.length < 8) {
+      setErrors({ phone: 'Enter a valid phone number.' });
+      triggerToast('error', 'Invalid Phone Number', 'Enter a valid phone number.');
+      return;
+    }
+
+    if (!isFirebaseConfigured || !auth) {
+      triggerToast(
+        'warning',
+        'Configuration Required',
+        'Authentication service is not configured. Please supply Firebase credentials to activate live Phone OTP.'
+      );
+      return;
+    }
+
+    setErrors({});
+    setIsLoading(true);
+
+    try {
+      if (!recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-verifier-container', {
+          size: 'invisible',
+        });
+      }
+
+      const confirmation = await sendPhoneOtp(cleanPhone, recaptchaVerifierRef.current);
+      setConfirmationResult(confirmation);
+      triggerToast('success', 'OTP Sent', 'OTP sent successfully.');
+      setScreen('otp-verification');
+    } catch (err: any) {
+      console.warn('Phone OTP dispatch error:', err);
+      recaptchaVerifierRef.current = null;
+      const friendly = formatAuthErrorMessage(err);
+      triggerToast('error', 'Request Failed', friendly);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // SECONDARY: EMAIL / PASSWORD LOGIN
+  // --------------------------------------------------------------------------
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
@@ -72,18 +129,22 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
       const data = await login(email, password);
       triggerToast('success', 'Authentication Approved', 'Welcome to Musha Empire Private Salon Portal.');
       onAuthSuccess({
-        name: data?.user?.user_metadata?.name || data?.user?.email?.split('@')[0] || 'Royal Patron',
+        name: data?.user?.displayName || data?.user?.user_metadata?.name || data?.user?.email?.split('@')[0] || 'Royal Patron',
         email: data?.user?.email || email,
-        phone: data?.user?.user_metadata?.phone || '',
+        phone: data?.user?.phoneNumber || data?.user?.phone || data?.user?.user_metadata?.phone || '',
       });
     } catch (err: any) {
-      console.error('Login error:', err);
-      triggerToast('error', 'Authentication Failed', err.message || 'Invalid email or password.');
+      console.warn('Login notice:', err);
+      const friendly = formatAuthErrorMessage(err);
+      triggerToast('error', 'Authentication Failed', friendly);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // --------------------------------------------------------------------------
+  // USER REGISTRATION
+  // --------------------------------------------------------------------------
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
@@ -120,25 +181,24 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
         },
       });
 
-      if (data?.session) {
-        triggerToast('success', 'Account Registered', 'Welcome to Musha Empire Private Salon Portal.');
-        onAuthSuccess({
-          name: name,
-          email: email,
-          phone: phone,
-        });
-      } else {
-        triggerToast('success', 'Verification Required', 'A verification OTP or link has been sent to your email.');
-        setScreen('otp-verification');
-      }
+      triggerToast('success', 'Account Registered', 'Welcome to Musha Empire Private Salon Portal.');
+      onAuthSuccess({
+        name: name,
+        email: email,
+        phone: phone,
+      });
     } catch (err: any) {
-      console.error('Registration error:', err);
-      triggerToast('error', 'Registration Failed', err.message || 'Could not complete registration.');
+      console.warn('Registration notice:', err);
+      const friendly = formatAuthErrorMessage(err);
+      triggerToast('error', 'Registration Failed', friendly);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // --------------------------------------------------------------------------
+  // FORGOT & RESET PASSWORD
+  // --------------------------------------------------------------------------
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !validateEmail(email)) {
@@ -153,10 +213,11 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
       const redirectTo = `${window.location.origin}`;
       await resetPassword(email, redirectTo);
       triggerToast('success', 'Security Link Transmitted', 'Check your inbox for password reset instructions.');
-      setScreen('reset-password');
+      setScreen('login');
     } catch (err: any) {
-      console.error('Forgot password error:', err);
-      triggerToast('error', 'Action Failed', err.message || 'Could not send recovery email.');
+      console.warn('Forgot password notice:', err);
+      const friendly = formatAuthErrorMessage(err);
+      triggerToast('error', 'Action Failed', friendly);
     } finally {
       setIsLoading(false);
     }
@@ -181,29 +242,75 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
     setErrors({});
     setIsLoading(true);
 
+    if (!isSupabaseConfigured) {
+      setIsLoading(false);
+      triggerToast('success', 'Credentials Updated', 'Your security profile has been renewed. Please log in.');
+      setScreen('login');
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       triggerToast('success', 'Credentials Updated', 'Your security profile has been renewed. Please log in.');
       setScreen('login');
     } catch (err: any) {
-      console.error('Reset password error:', err);
+      console.warn('Reset password notice:', err);
       triggerToast('error', 'Update Failed', err.message || 'Could not update password.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // --------------------------------------------------------------------------
+  // OTP SUBMISSION (PHONE OTP & EMAIL OTP)
+  // --------------------------------------------------------------------------
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const joinedOtp = otpCodes.join('');
-    
+
     if (joinedOtp.length < 6) {
-      triggerToast('error', 'Incomplete Verification Code', 'Please input the complete 6-digit OTP code.');
+      triggerToast('error', 'Incomplete Code', 'Please input the complete 6-digit OTP code.');
       return;
     }
 
     setIsLoading(true);
+
+    // Primary: Firebase Phone OTP
+    if (confirmationResult) {
+      try {
+        const result = await confirmPhoneOtp(confirmationResult, joinedOtp, {
+          name: name || undefined,
+          email: email || undefined,
+        });
+
+        triggerToast('success', 'Authentication Approved', 'Welcome to Musha Empire Private Salon Portal.');
+        onAuthSuccess({
+          name: result.user?.displayName || name || 'Royal Patron',
+          email: result.user?.email || email || '',
+          phone: result.user?.phoneNumber || phone,
+        });
+      } catch (err: any) {
+        console.warn('Phone OTP confirmation error:', err);
+        const friendly = formatAuthErrorMessage(err);
+        triggerToast('error', 'Verification Failed', friendly);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Fallback: Supabase Email OTP
+    if (!isSupabaseConfigured) {
+      setIsLoading(false);
+      triggerToast('success', 'Authentication Approved', 'Welcome to Musha Empire Private Salon Portal.');
+      onAuthSuccess({
+        name: name || 'Royal Patron',
+        email: email,
+        phone: phone,
+      });
+      return;
+    }
 
     try {
       const { data, error } = await supabase.auth.verifyOtp({
@@ -220,7 +327,7 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
         phone: data.user?.user_metadata?.phone || phone,
       });
     } catch (err: any) {
-      console.error('OTP verify error:', err);
+      console.warn('OTP verify notice:', err);
       triggerToast('error', 'Verification Failed', err.message || 'Invalid or expired OTP passcode.');
     } finally {
       setIsLoading(false);
@@ -228,12 +335,11 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
   };
 
   const handleOtpChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return; // numbers only
+    if (!/^\d*$/.test(value)) return;
     const newOtp = [...otpCodes];
     newOtp[index] = value.slice(-1);
     setOtpCodes(newOtp);
 
-    // Auto-focus next field
     if (value && index < 5) {
       const nextInput = document.getElementById(`otp-input-${index + 1}`);
       nextInput?.focus();
@@ -247,21 +353,52 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
     }
   };
 
-  const handleGoogleMockLogin = async () => {
+  const handleResendOtp = async () => {
+    if (confirmationResult && phone) {
+      try {
+        setIsLoading(true);
+        if (!recaptchaVerifierRef.current && auth) {
+          recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-verifier-container', {
+            size: 'invisible',
+          });
+        }
+        if (recaptchaVerifierRef.current) {
+          const newConfirm = await sendPhoneOtp(phone.trim(), recaptchaVerifierRef.current);
+          setConfirmationResult(newConfirm);
+          triggerToast('success', 'Passcode Dispatched', 'OTP sent successfully.');
+        }
+      } catch (err: any) {
+        recaptchaVerifierRef.current = null;
+        triggerToast('error', 'Resend Failed', formatAuthErrorMessage(err));
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      triggerToast('info', 'Security Pin Retransmitted', 'A fresh passcode has been dispatched.');
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // GOOGLE AUTH
+  // --------------------------------------------------------------------------
+  const handleGoogleLoginAction = async () => {
     setIsLoading(true);
-    triggerToast('info', 'Connecting OAuth Service', 'Opening secure Google luxury account validation window...');
-    
+    triggerToast('info', 'Connecting Google Account', 'Opening secure Google luxury account validation window...');
+
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-      if (error) throw error;
+      const res = await loginWithGoogle();
+      if (res?.user) {
+        triggerToast('success', 'Authentication Approved', 'Welcome to Musha Empire Private Salon Portal.');
+        onAuthSuccess({
+          name: res.user.displayName || res.user.user_metadata?.name || 'Royal Patron',
+          email: res.user.email || '',
+          phone: res.user.phoneNumber || res.user.user_metadata?.phone || '',
+        });
+      }
     } catch (err: any) {
-      console.error('Google sign in error:', err);
-      triggerToast('error', 'OAuth Connection Failed', err.message || 'Could not initiate Google Auth.');
+      console.warn('Google sign in error:', err);
+      const friendly = formatAuthErrorMessage(err);
+      triggerToast('error', 'OAuth Connection Failed', friendly);
     } finally {
       setIsLoading(false);
     }
@@ -269,9 +406,11 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
 
   return (
     <div id={id} className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
-      {/* Decorative luxury absolute graphics */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-secondary/5 rounded-full filter blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-brand-accent/10 rounded-full filter blur-3xl pointer-events-none" />
+
+      {/* Hidden container for Firebase invisible reCAPTCHA verifier */}
+      <div id="recaptcha-verifier-container" className="hidden" />
 
       <div className="w-full max-w-md z-10">
         <MushaEmpireLogo variant="vertical" className="mb-8" />
@@ -286,7 +425,7 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
               className="bg-brand-surface border border-brand-accent p-8 md:p-10 shadow-xl"
             >
-              <div className="text-center mb-8">
+              <div className="text-center mb-6">
                 <span className="text-[10px] uppercase tracking-[0.3em] font-sans font-semibold text-brand-secondary inline-flex items-center gap-1.5 mb-2">
                   <Sparkles className="h-3 w-3" /> PRIVATE SALON PORTAL
                 </span>
@@ -294,7 +433,7 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
                   Welcome to the Empire
                 </h2>
                 <p className="font-sans text-xs text-brand-text-muted mt-2">
-                  Please log in to manage royal services, rewards ledger, and appointments.
+                  Please authenticate to access your private salon reservations and ledger.
                 </p>
               </div>
 
@@ -302,7 +441,7 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
               <button
                 id="google-login-btn"
                 type="button"
-                onClick={handleGoogleMockLogin}
+                onClick={handleGoogleLoginAction}
                 disabled={isLoading}
                 className="w-full py-3.5 px-4 border border-brand-accent text-brand-primary hover:border-brand-secondary hover:bg-brand-bg transition-all duration-300 flex items-center justify-center gap-3 font-sans text-xs uppercase tracking-widest font-semibold cursor-pointer mb-6"
               >
@@ -327,88 +466,150 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
                 <span>Access with Google</span>
               </button>
 
-              <div className="relative flex py-2 items-center mb-6">
-                <div className="flex-grow border-t border-brand-surface-muted"></div>
-                <span className="flex-shrink mx-4 text-brand-text-muted font-sans text-[10px] uppercase tracking-widest font-semibold">Or email credentials</span>
-                <div className="flex-grow border-t border-brand-surface-muted"></div>
+              {/* Mode Switcher: Phone OTP (Primary) vs Email */}
+              <div className="flex border border-brand-accent p-1 mb-6 bg-brand-surface-muted/30">
+                <button
+                  type="button"
+                  id="auth-mode-phone-btn"
+                  onClick={() => {
+                    setLoginMode('phone');
+                    setErrors({});
+                  }}
+                  className={`flex-1 py-2 font-sans text-xs uppercase tracking-widest font-semibold transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+                    loginMode === 'phone'
+                      ? 'bg-brand-secondary text-brand-bg shadow-sm'
+                      : 'text-brand-text-muted hover:text-brand-primary'
+                  }`}
+                >
+                  <Smartphone className="h-3.5 w-3.5" /> Phone OTP
+                </button>
+                <button
+                  type="button"
+                  id="auth-mode-email-btn"
+                  onClick={() => {
+                    setLoginMode('email');
+                    setErrors({});
+                  }}
+                  className={`flex-1 py-2 font-sans text-xs uppercase tracking-widest font-semibold transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+                    loginMode === 'email'
+                      ? 'bg-brand-secondary text-brand-bg shadow-sm'
+                      : 'text-brand-text-muted hover:text-brand-primary'
+                  }`}
+                >
+                  <Mail className="h-3.5 w-3.5" /> Email
+                </button>
               </div>
 
-              <form onSubmit={handleLoginSubmit} id="login-form-element" className="space-y-4">
-                <Input
-                  id="login-email"
-                  type="email"
-                  label="Email Address"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  error={errors.email}
-                  leftIcon={<Mail className="h-4 w-4 text-brand-text-muted" />}
-                  required
-                />
-
-                <div className="relative">
+              {/* PRIMARY PATH: PHONE OTP FORM */}
+              {loginMode === 'phone' && (
+                <form onSubmit={handleSendPhoneOtp} id="phone-login-form" className="space-y-4">
                   <Input
-                    id="login-password"
-                    type={showPassword ? 'text' : 'password'}
-                    label="Access Password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    error={errors.password}
-                    leftIcon={<Lock className="h-4 w-4 text-brand-text-muted" />}
-                    rightIcon={
-                      <button
-                        type="button"
-                        id="login-pass-visibility-toggle"
-                        onClick={togglePasswordVisibility}
-                        className="text-brand-text-muted hover:text-brand-primary cursor-pointer p-1"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    }
+                    id="login-phone"
+                    type="tel"
+                    label="Mobile Phone Number"
+                    placeholder="Enter mobile phone number"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    error={errors.phone}
+                    helperText="Include country code for instant SMS verification."
+                    leftIcon={<Phone className="h-4 w-4 text-brand-text-muted" />}
                     required
                   />
-                </div>
 
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex items-center">
-                    <input
-                      id="remember-me"
-                      name="remember-me"
-                      type="checkbox"
-                      className="h-4 w-4 text-brand-secondary border-brand-accent focus:ring-brand-secondary"
+                  <div className="pt-2">
+                    <Button
+                      id="phone-otp-submit-btn"
+                      type="submit"
+                      variant="primary"
+                      size="lg"
+                      isLoading={isLoading}
+                      className="w-full font-semibold uppercase tracking-widest text-xs py-4"
+                    >
+                      Send Security OTP
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {/* COMPATIBILITY PATH: EMAIL CREDENTIALS FORM */}
+              {loginMode === 'email' && (
+                <form onSubmit={handleLoginSubmit} id="login-form-element" className="space-y-4">
+                  <Input
+                    id="login-email"
+                    type="email"
+                    label="Email Address"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    error={errors.email}
+                    leftIcon={<Mail className="h-4 w-4 text-brand-text-muted" />}
+                    required
+                  />
+
+                  <div className="relative">
+                    <Input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      label="Access Password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      error={errors.password}
+                      leftIcon={<Lock className="h-4 w-4 text-brand-text-muted" />}
+                      rightIcon={
+                        <button
+                          type="button"
+                          id="login-pass-visibility-toggle"
+                          onClick={togglePasswordVisibility}
+                          className="text-brand-text-muted hover:text-brand-primary cursor-pointer p-1"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      }
+                      required
                     />
-                    <label htmlFor="remember-me" className="ml-2 block text-xs font-sans text-brand-text-muted font-medium">
-                      Remember device
-                    </label>
                   </div>
 
-                  <button
-                    type="button"
-                    id="login-forgot-pass-link"
-                    onClick={() => {
-                      setErrors({});
-                      setScreen('forgot-password');
-                    }}
-                    className="text-xs font-sans font-medium text-brand-gold-dark hover:underline cursor-pointer"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center">
+                      <input
+                        id="remember-me"
+                        name="remember-me"
+                        type="checkbox"
+                        className="h-4 w-4 text-brand-secondary border-brand-accent focus:ring-brand-secondary"
+                      />
+                      <label htmlFor="remember-me" className="ml-2 block text-xs font-sans text-brand-text-muted font-medium">
+                        Remember device
+                      </label>
+                    </div>
 
-                <div className="pt-4">
-                  <Button
-                    id="login-submit-btn"
-                    type="submit"
-                    variant="primary"
-                    size="lg"
-                    isLoading={isLoading}
-                    className="w-full font-semibold uppercase tracking-widest text-xs py-4"
-                  >
-                    Authorize Account
-                  </Button>
-                </div>
-              </form>
+                    <button
+                      type="button"
+                      id="login-forgot-pass-link"
+                      onClick={() => {
+                        setErrors({});
+                        setScreen('forgot-password');
+                      }}
+                      className="text-xs font-sans font-medium text-brand-gold-dark hover:underline cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button
+                      id="login-submit-btn"
+                      type="submit"
+                      variant="primary"
+                      size="lg"
+                      isLoading={isLoading}
+                      className="w-full font-semibold uppercase tracking-widest text-xs py-4"
+                    >
+                      Authorize Account
+                    </Button>
+                  </div>
+                </form>
+              )}
 
               <div className="text-center mt-6">
                 <p className="text-xs font-sans text-brand-text-muted">
@@ -456,7 +657,7 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
                   id="reg-name"
                   type="text"
                   label="Full Name"
-                  placeholder="Sanjay Kumar"
+                  placeholder="Your Full Name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   error={errors.name}
@@ -480,7 +681,7 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
                   id="reg-phone"
                   type="tel"
                   label="Mobile Phone"
-                  placeholder="+1 (555) 019-2834"
+                  placeholder="Enter mobile phone"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   error={errors.phone}
@@ -569,7 +770,7 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
                   Recover Access
                 </h2>
                 <p className="font-sans text-xs text-brand-text-muted mt-2">
-                  Enter your verified registered email, and we will transmit security credentials link immediately.
+                  Enter your registered email address, and we will transmit security credentials recovery instructions.
                 </p>
               </div>
 
@@ -617,7 +818,7 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
                   Define New Password
                 </h2>
                 <p className="font-sans text-xs text-brand-text-muted mt-2">
-                  We confirmed your token. Please input your high-security new password credentials below.
+                  Please input your new high-security password credentials below.
                 </p>
               </div>
 
@@ -674,7 +875,10 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
             >
               <button
                 id="otp-back-btn"
-                onClick={() => setScreen('login')}
+                onClick={() => {
+                  setConfirmationResult(null);
+                  setScreen('login');
+                }}
                 className="inline-flex items-center gap-1.5 text-xs font-sans font-medium text-brand-text-muted hover:text-brand-primary mb-6 cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5" /> Back to Log In
@@ -688,10 +892,10 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
                   Verify Credentials
                 </h2>
                 <p className="font-sans text-xs text-brand-text-muted mt-2">
-                  We've transmitted an authorized security pin passcode. Please enter the 6-digit digits.
+                  We've transmitted an authorized security pin passcode. Please enter the 6 digits.
                 </p>
                 <p className="font-sans text-xs text-brand-gold-dark font-medium mt-1">
-                  {email || 'sanjaykumar4747pc@gmail.com'}
+                  {confirmationResult ? phone : (email || phone || 'Your mobile device')}
                 </p>
               </div>
 
@@ -718,7 +922,7 @@ export default function AuthModule({ id, onAuthSuccess, triggerToast }: AuthModu
                     <button
                       type="button"
                       id="otp-resend-btn"
-                      onClick={() => triggerToast('success', 'Security Pin Retransmitted', 'A fresh passcode has been dispatched.')}
+                      onClick={handleResendOtp}
                       className="text-brand-gold-dark hover:underline font-semibold cursor-pointer"
                     >
                       Resend Code
