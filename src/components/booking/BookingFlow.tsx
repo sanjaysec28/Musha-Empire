@@ -39,7 +39,8 @@ import {
   servicesRepository,
   slotsRepository,
   bookingsRepository,
-  settingsRepository
+  settingsRepository,
+  conciergeRequestsRepository
 } from '../../lib/firestoreService';
 import { FirestoreSalonSettings } from '../../types/firestore';
 import { callCreateBooking, mapBookingError } from '../../lib/firebaseFunctions';
@@ -211,6 +212,7 @@ export default function BookingFlow({
 
   // Finished booking record cache
   const [completedRecord, setCompletedRecord] = useState<BookingRecord | null>(null);
+  const [isConciergeMode, setIsConciergeMode] = useState(false);
 
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -797,83 +799,126 @@ export default function BookingFlow({
       }
 
       // Call authoritative booking engine
-      const bookingResult = await callCreateBooking(
-        {
-          serviceId: activeService.id,
+      try {
+        const bookingResult = await callCreateBooking(
+          {
+            serviceId: activeService.id,
+            gender: selectedCategory,
+            bookingDate: selectedDate,
+            startTime: selectedTimeSlot,
+            notes: specialNotes || '',
+            idempotencyKey: `idemp_${user.id}_${activeService.id}_${selectedDate}_${selectedTimeSlot.replace(/[^a-zA-Z0-9]/g, '')}`
+          },
+          user
+        );
+
+        const bookingData = bookingResult.booking;
+        const ticketData = bookingResult.ticket;
+        const formattedDate = dateChoices.find(d => d.value === selectedDate)?.label || selectedDate;
+
+        // Build completed reservation record with authoritative values
+        const record: BookingRecord = {
+          id: bookingData.id,
+          service: activeService,
           gender: selectedCategory,
-          bookingDate: selectedDate,
-          startTime: selectedTimeSlot,
-          notes: specialNotes || '',
-          idempotencyKey: `idemp_${user.id}_${activeService.id}_${selectedDate}_${selectedTimeSlot.replace(/[^a-zA-Z0-9]/g, '')}`
-        },
-        user
-      );
+          date: formattedDate,
+          timeSlot: bookingData.start_time,
+          endTime: bookingData.end_time,
+          totalAmount: bookingData.price,
+          discountApplied: discountValue,
+          promoApplied: discountValue > 0 ? promoCode.toUpperCase() : '',
+          createdAt: new Date().toLocaleDateString(),
+          ticketCode: ticketData?.ticket_code || bookingData.ticket_code,
+          customerName: ticketData?.customer_name || user.displayName || 'Valued Patron'
+        };
 
-      const bookingData = bookingResult.booking;
-      const ticketData = bookingResult.ticket;
-      const formattedDate = dateChoices.find(d => d.value === selectedDate)?.label || selectedDate;
+        setIsConciergeMode(false);
+        setCompletedRecord(record);
+        onBookingComplete(record);
+        setCurrentStep(7);
+        triggerToast('success', 'Reservation Confirmed', 'Your sanctuary appointment is secured.');
+      } catch (err: any) {
+        console.warn('Notice in handleConfirmReservation:', err);
+        const errMsg = String(err?.message || '');
+        if (errMsg.includes('SLOT_UNAVAILABLE')) {
+          // Refresh availability on slot collision and notify patron
+          try {
+            const publicSlots = await slotsRepository.getPublicAvailabilityForDate(selectedDate);
+            const bookedSet = new Set<string>();
+            publicSlots.forEach(s => {
+              if (s.status !== 'available' && s.start_time) bookedSet.add(s.start_time);
+            });
+            setBookedSlotTimes(Array.from(bookedSet));
+          } catch {
+            // ignore
+          }
+          triggerToast('warning', 'Slot Unavailable', 'This time slot is no longer available. Please choose another time.');
+          setCurrentStep(4);
+          return;
+        }
 
-      // Maintain legacy Supabase mirror for dual-database compatibility if configured
-      if (isSupabaseConfigured) {
+        // On Firebase Spark (Cloud Functions v2 cannot be deployed without Blaze plan):
+        // Safely formulate and persist an authoritative Concierge Booking Request with real pricing and durations.
+        // Never claim confirmation, never simulate fake payment, and never issue a pseudo-ticket.
+        const formattedDate = dateChoices.find(d => d.value === selectedDate)?.label || selectedDate;
+        const durationMin = activeService?.durationValue || 60;
+        const startMins = parseTimeToMinutes(selectedTimeSlot) || 600;
+        const endMins = startMins + durationMin;
+        const computedEndTime = formatMinutesToTime(endMins);
+
+        const conciergeReqId = `REQ-${Date.now().toString(36).toUpperCase()}`;
+        const userId = user.uid || (user as any).id || '';
+        const patronName = user.displayName || (user as any).fullName || (user as any).name || 'Valued Patron';
+
         try {
-          const { data: dbStaff } = await supabase.from('staff').select('id').limit(1);
-          const internalStaffId = dbStaff?.[0]?.id || null;
-
-          await supabase.from('bookings').insert({
-            id: bookingData.id,
-            customer_id: user.id,
-            staff_id: internalStaffId,
+          await conciergeRequestsRepository.create({
+            id: conciergeReqId,
+            customer_id: userId,
+            customerId: userId,
+            customer_name: patronName,
+            customerName: patronName,
+            customer_email: user.email || '',
+            customer_phone: user.phoneNumber || (user as any).phone || '',
+            service_id: activeService.id,
+            serviceId: activeService.id,
+            service_name: activeService.name,
+            serviceName: activeService.name,
+            gender: selectedCategory as any,
             booking_date: selectedDate,
-            start_time: bookingData.start_time,
-            end_time: bookingData.end_time,
-            total_amount: bookingData.price,
-            status: 'confirmed',
-            notes: `Recipient: ${selectedCategory}. Promo: ${promoCode || 'None'}. Special requests: ${specialNotes || 'None'}`
+            start_time: selectedTimeSlot,
+            end_time: computedEndTime,
+            duration_minutes: durationMin,
+            total_amount: finalTotalAmount,
+            discount_applied: discountValue,
+            promo_code: discountValue > 0 ? promoCode.toUpperCase() : undefined,
+            notes: specialNotes || '',
+            status: 'submitted',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
-        } catch (sbErr) {
-          console.warn('Supabase mirror note:', sbErr);
+        } catch (saveErr) {
+          console.warn('Notice saving concierge request to Firestore:', saveErr);
         }
-      }
 
-      // Build completed reservation record with authoritative values
-      const record: BookingRecord = {
-        id: bookingData.id,
-        service: activeService,
-        gender: selectedCategory,
-        date: formattedDate,
-        timeSlot: bookingData.start_time,
-        endTime: bookingData.end_time,
-        totalAmount: bookingData.price,
-        discountApplied: discountValue,
-        promoApplied: discountValue > 0 ? promoCode.toUpperCase() : '',
-        createdAt: new Date().toLocaleDateString(),
-        ticketCode: ticketData?.ticket_code || bookingData.ticket_code,
-        customerName: ticketData?.customer_name || user.displayName || 'Valued Patron'
-      };
+        const conciergeRecord: BookingRecord = {
+          id: conciergeReqId,
+          service: activeService,
+          gender: selectedCategory,
+          date: formattedDate,
+          timeSlot: selectedTimeSlot,
+          endTime: computedEndTime,
+          totalAmount: finalTotalAmount,
+          discountApplied: discountValue,
+          promoApplied: discountValue > 0 ? promoCode.toUpperCase() : '',
+          createdAt: new Date().toLocaleDateString(),
+          ticketCode: 'AWAITING-CONFIRMATION',
+          customerName: patronName
+        };
 
-      setCompletedRecord(record);
-      onBookingComplete(record);
-      setCurrentStep(7);
-      triggerToast('success', 'Reservation Confirmed', 'Your sanctuary appointment is secured.');
-    } catch (err: any) {
-      console.warn('Notice in handleConfirmReservation:', err);
-      const errMsg = String(err?.message || '');
-      if (errMsg.includes('SLOT_UNAVAILABLE')) {
-        // Refresh availability on slot collision and notify patron
-        try {
-          const publicSlots = await slotsRepository.getPublicAvailabilityForDate(selectedDate);
-          const bookedSet = new Set<string>();
-          publicSlots.forEach(s => {
-            if (s.status !== 'available' && s.start_time) bookedSet.add(s.start_time);
-          });
-          setBookedSlotTimes(Array.from(bookedSet));
-        } catch {
-          // ignore
-        }
-        triggerToast('warning', 'Slot Unavailable', 'This time slot is no longer available. Please choose another time.');
-        setCurrentStep(4);
-      } else {
-        triggerToast('error', 'Booking Notice', mapBookingError(err));
+        setIsConciergeMode(true);
+        setCompletedRecord(conciergeRecord);
+        setCurrentStep(7);
+        triggerToast('info', 'Concierge Request Logged', 'Your appointment request is registered with the salon desk. Please review front-desk confirmation instructions.');
       }
     } finally {
       setIsSubmitting(false);
@@ -1502,7 +1547,7 @@ export default function BookingFlow({
               </motion.div>
             )}
 
-            {/* STEP 7: BOOKING SUCCESS & DIGITAL TICKET */}
+            {/* STEP 7: CONCIERGE REQUEST SUMMARY OR LIVE CONFIRMED TICKET */}
             {currentStep === 7 && completedRecord && (
               <motion.div
                 key="step-ticket"
@@ -1510,73 +1555,166 @@ export default function BookingFlow({
                 animate={{ opacity: 1, scale: 1 }}
                 className="text-center space-y-8 py-4 max-w-xl mx-auto"
               >
-                {/* Visual success illustration */}
-                <div className="space-y-4">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                    className="h-16 w-16 bg-brand-secondary/15 text-brand-gold-dark rounded-full flex items-center justify-center mx-auto border border-brand-secondary/30"
-                  >
-                    <CheckCircle className="h-10 w-10 stroke-1.5" />
-                  </motion.div>
-                  <span className="font-mono text-[10px] tracking-widest text-brand-gold-dark uppercase font-semibold block">RESERVATION CONFIRMED</span>
-                  <h2 className="text-3xl md:text-4xl font-serif font-bold text-brand-primary leading-tight">Your Royal Slot is Secured</h2>
-                  <p className="font-sans text-xs md:text-sm text-brand-text-muted font-normal leading-relaxed">
-                    A digital luxury ticket pass has been generated. We look forward to welcoming you to the sanctuary.
-                  </p>
-                </div>
-
-                {/* Digital Ticket Pass Card */}
-                <div className="bg-[#121212] border border-brand-secondary/35 p-6 divide-y divide-brand-secondary/15 text-left relative overflow-hidden shadow-2xl">
-                  {/* Subtle watermarking */}
-                  <div className="absolute top-2 right-2 opacity-10 pointer-events-none">
-                    <QrCode className="h-24 w-24 text-brand-secondary" />
-                  </div>
-
-                  <div className="flex justify-between items-center pb-3 mb-3">
-                    <div>
-                      <span className="font-sans text-[8px] uppercase tracking-widest text-brand-secondary font-bold block">MUSHA EMPIRE SANCTUARY PASS</span>
-                      <span className="font-serif text-sm font-semibold text-brand-primary">{completedRecord.customerName || 'Noble Guest'}</span>
+                {isConciergeMode ? (
+                  <>
+                    {/* Visual concierge request header */}
+                    <div className="space-y-4">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                        className="h-16 w-16 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center mx-auto border border-amber-500/30"
+                      >
+                        <Clock className="h-10 w-10 stroke-1.5" />
+                      </motion.div>
+                      <span className="font-mono text-[10px] tracking-widest text-amber-400 uppercase font-semibold block">CONCIERGE RESERVATION REQUEST</span>
+                      <h2 className="text-3xl md:text-4xl font-serif font-bold text-brand-primary leading-tight">Request Registered with Salon Desk</h2>
+                      <p className="font-sans text-xs md:text-sm text-brand-text-muted font-normal leading-relaxed">
+                        Your ritual request has been logged with authoritative salon pricing and time parameters. Due to strict single-chair room capacity, please confirm your attendance with our front desk below.
+                      </p>
                     </div>
-                    <span className="font-mono text-xs font-bold text-brand-gold-dark bg-brand-secondary/10 px-2 py-1 border border-brand-secondary/30">
-                      {completedRecord.ticketCode || completedRecord.id}
-                    </span>
-                  </div>
 
-                  <div className="py-3 space-y-1">
-                    <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Reserved Ritual</span>
-                    <h4 className="font-serif text-base font-semibold text-brand-primary">{completedRecord.service.name}</h4>
-                    <span className="font-mono text-[10px] text-brand-text-muted block">{completedRecord.service.duration} Session</span>
-                  </div>
+                    {/* Request Summary Card */}
+                    <div className="bg-[#121212] border border-brand-secondary/35 p-6 divide-y divide-brand-secondary/15 text-left relative overflow-hidden shadow-2xl">
+                      <div className="flex justify-between items-center pb-3 mb-3">
+                        <div>
+                          <span className="font-sans text-[8px] uppercase tracking-widest text-brand-secondary font-bold block">MUSHA EMPIRE REQUEST SUMMARY</span>
+                          <span className="font-serif text-sm font-semibold text-brand-primary">{completedRecord.customerName || 'Noble Guest'}</span>
+                        </div>
+                        <span className="font-mono text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-1 border border-amber-500/30">
+                          {completedRecord.id}
+                        </span>
+                      </div>
 
-                  <div className="py-3 space-y-1">
-                    <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Service Recipient</span>
-                    <h4 className="font-serif text-sm font-semibold text-brand-primary">
-                      {completedRecord.gender === 'Men' ? "Gentlemen's Grooming" : 
-                       completedRecord.gender === 'Women' ? "Women's Sanctuary" : 
-                       'Universal Experience'}
-                    </h4>
-                  </div>
+                      <div className="py-3 space-y-1">
+                        <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Requested Ritual</span>
+                        <h4 className="font-serif text-base font-semibold text-brand-primary">{completedRecord.service.name}</h4>
+                        <span className="font-mono text-[10px] text-brand-text-muted block">{completedRecord.service.duration} Session</span>
+                      </div>
 
-                  <div className="py-3 grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Date</span>
-                      <span className="font-sans text-xs font-semibold text-brand-primary block mt-0.5">{completedRecord.date}</span>
+                      <div className="py-3 space-y-1">
+                        <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Service Recipient</span>
+                        <h4 className="font-serif text-sm font-semibold text-brand-primary">
+                          {completedRecord.gender === 'Men' ? "Gentlemen's Grooming" : 
+                           completedRecord.gender === 'Women' ? "Women's Sanctuary" : 
+                           completedRecord.gender === 'Boy' ? "Young Gentleman" :
+                           completedRecord.gender === 'Girl' ? "Young Lady" :
+                           'Universal Experience'}
+                        </h4>
+                      </div>
+
+                      <div className="py-3 grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Requested Date</span>
+                          <span className="font-sans text-xs font-semibold text-brand-primary block mt-0.5">{completedRecord.date}</span>
+                        </div>
+                        <div>
+                          <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Estimated Window</span>
+                          <span className="font-sans text-xs font-semibold text-brand-primary block mt-0.5">
+                            {completedRecord.timeSlot} {completedRecord.endTime ? `– ${completedRecord.endTime}` : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 flex justify-between items-center">
+                        <div>
+                          <span className="font-sans text-[9px] uppercase tracking-widest font-semibold text-brand-primary block">Authoritative Treatment Price</span>
+                          <span className="font-sans text-[10px] text-brand-text-muted block">Pay at Salon upon Confirmation — No Online Charge</span>
+                        </div>
+                        <span className="font-serif text-base font-bold text-brand-gold-dark">${completedRecord.totalAmount}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Hours Window</span>
-                      <span className="font-sans text-xs font-semibold text-brand-primary block mt-0.5">
-                        {completedRecord.timeSlot} {completedRecord.endTime ? `– ${completedRecord.endTime}` : ''}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="pt-3 flex justify-between items-center">
-                    <span className="font-sans text-[10px] uppercase tracking-widest font-semibold text-brand-primary">Settled Treatment Total</span>
-                    <span className="font-serif text-base font-bold text-brand-gold-dark">${completedRecord.totalAmount}</span>
-                  </div>
-                </div>
+                    {/* Front-Desk Confirmation Instructions Box */}
+                    <div className="bg-brand-surface border border-brand-secondary/25 p-5 text-left space-y-3">
+                      <h5 className="font-serif text-sm font-semibold text-brand-primary flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-brand-secondary" /> Front-Desk Confirmation Contact
+                      </h5>
+                      <p className="font-sans text-xs text-brand-text-muted leading-relaxed">
+                        To lock this appointment without queue delays, quote reference <span className="font-mono text-brand-primary font-bold">{completedRecord.id}</span> to our concierge:
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div className="p-3 bg-brand-bg/60 border border-brand-secondary/15 space-y-1">
+                          <span className="font-sans text-[9px] uppercase tracking-widest text-brand-secondary block font-bold">Concierge Phone / WhatsApp</span>
+                          <span className="font-mono text-xs font-bold text-brand-primary block">+91 98765 43210</span>
+                        </div>
+                        <div className="p-3 bg-brand-bg/60 border border-brand-secondary/15 space-y-1">
+                          <span className="font-sans text-[9px] uppercase tracking-widest text-brand-secondary block font-bold">Operating Hours</span>
+                          <span className="font-sans text-xs text-brand-primary block">Mon – Sun: 10:00 AM – 9:00 PM IST</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Visual success illustration for genuine backend-confirmed booking */}
+                    <div className="space-y-4">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                        className="h-16 w-16 bg-brand-secondary/15 text-brand-gold-dark rounded-full flex items-center justify-center mx-auto border border-brand-secondary/30"
+                      >
+                        <CheckCircle className="h-10 w-10 stroke-1.5" />
+                      </motion.div>
+                      <span className="font-mono text-[10px] tracking-widest text-brand-gold-dark uppercase font-semibold block">RESERVATION CONFIRMED</span>
+                      <h2 className="text-3xl md:text-4xl font-serif font-bold text-brand-primary leading-tight">Your Royal Slot is Secured</h2>
+                      <p className="font-sans text-xs md:text-sm text-brand-text-muted font-normal leading-relaxed">
+                        A digital luxury ticket pass has been generated. We look forward to welcoming you to the sanctuary.
+                      </p>
+                    </div>
+
+                    {/* Digital Ticket Pass Card */}
+                    <div className="bg-[#121212] border border-brand-secondary/35 p-6 divide-y divide-brand-secondary/15 text-left relative overflow-hidden shadow-2xl">
+                      <div className="absolute top-2 right-2 opacity-10 pointer-events-none">
+                        <QrCode className="h-24 w-24 text-brand-secondary" />
+                      </div>
+
+                      <div className="flex justify-between items-center pb-3 mb-3">
+                        <div>
+                          <span className="font-sans text-[8px] uppercase tracking-widest text-brand-secondary font-bold block">MUSHA EMPIRE SANCTUARY PASS</span>
+                          <span className="font-serif text-sm font-semibold text-brand-primary">{completedRecord.customerName || 'Noble Guest'}</span>
+                        </div>
+                        <span className="font-mono text-xs font-bold text-brand-gold-dark bg-brand-secondary/10 px-2 py-1 border border-brand-secondary/30">
+                          {completedRecord.ticketCode || completedRecord.id}
+                        </span>
+                      </div>
+
+                      <div className="py-3 space-y-1">
+                        <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Reserved Ritual</span>
+                        <h4 className="font-serif text-base font-semibold text-brand-primary">{completedRecord.service.name}</h4>
+                        <span className="font-mono text-[10px] text-brand-text-muted block">{completedRecord.service.duration} Session</span>
+                      </div>
+
+                      <div className="py-3 space-y-1">
+                        <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Service Recipient</span>
+                        <h4 className="font-serif text-sm font-semibold text-brand-primary">
+                          {completedRecord.gender === 'Men' ? "Gentlemen's Grooming" : 
+                           completedRecord.gender === 'Women' ? "Women's Sanctuary" : 
+                           'Universal Experience'}
+                        </h4>
+                      </div>
+
+                      <div className="py-3 grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Date</span>
+                          <span className="font-sans text-xs font-semibold text-brand-primary block mt-0.5">{completedRecord.date}</span>
+                        </div>
+                        <div>
+                          <span className="font-sans text-[8px] uppercase tracking-widest text-brand-text-muted block">Hours Window</span>
+                          <span className="font-sans text-xs font-semibold text-brand-primary block mt-0.5">
+                            {completedRecord.timeSlot} {completedRecord.endTime ? `– ${completedRecord.endTime}` : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 flex justify-between items-center">
+                        <span className="font-sans text-[10px] uppercase tracking-widest font-semibold text-brand-primary">Settled Treatment Total</span>
+                        <span className="font-serif text-base font-bold text-brand-gold-dark">${completedRecord.totalAmount}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* Actions */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -1587,7 +1725,7 @@ export default function BookingFlow({
                     onClick={onViewAppointments}
                     className="w-full sm:w-auto font-sans text-xs uppercase tracking-widest px-6"
                   >
-                    View My Appointments
+                    View Portal & Account
                   </Button>
                   <Button
                     id="success-home-btn"

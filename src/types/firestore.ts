@@ -284,3 +284,34 @@ export interface FirestoreTicket {
   updated_at: string;
   updatedAt?: string;
 }
+
+export type ConciergeRequestStatus = 'submitted' | 'reviewed' | 'contacted' | 'completed' | 'cancelled';
+
+export interface FirestoreConciergeRequest {
+  id: string;
+  customer_id: string;
+  customerId?: string;
+  customer_name: string;
+  customerName?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  service_id: string;
+  serviceId?: string;
+  service_name: string;
+  serviceName?: string;
+  gender: ServiceGenderCategory;
+  booking_date: string;
+  start_time: string;
+  end_time?: string;
+  duration_minutes: number;
+  total_amount: number;
+  discount_applied?: number;
+  promo_code?: string;
+  notes?: string;
+  status: ConciergeRequestStatus;
+  created_at: string;
+  updated_at: string;
+  reviewed_by?: string;
+  staff_notes?: string;
+}
+

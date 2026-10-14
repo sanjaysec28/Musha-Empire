@@ -10,7 +10,9 @@ import {
   Plus, Edit, Trash2, Upload, Sparkles, AlertCircle, 
   DollarSign, Check, ChevronRight, X, Briefcase, Award 
 } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { usersRepository, bookingsRepository, conciergeRequestsRepository } from '../../lib/firestoreService';
+import { FirestoreConciergeRequest, ConciergeRequestStatus } from '../../types/firestore';
+import { useAuth } from '../../contexts/AuthContext';
 import { STYLISTS_DATA } from '../../data/salonData';
 import { 
   parseStaffBio, serializeStaffBio, isStaffOnLeave, isStaffWorking, StaffMetadata 
@@ -42,6 +44,9 @@ interface DBStaff {
 export default function StaffManagement({ id, triggerToast }: StaffManagementProps) {
   const [staffList, setStaffList] = useState<DBStaff[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [conciergeRequests, setConciergeRequests] = useState<FirestoreConciergeRequest[]>([]);
+  const [activeSubTab, setActiveSubTab] = useState<'staff' | 'requests'>('staff');
+  const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingStaff, setEditingStaff] = useState<DBStaff | null>(null);
@@ -74,83 +79,85 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
   const [newLeaveStart, setNewLeaveStart] = useState<string>('');
   const [newLeaveEnd, setNewLeaveEnd] = useState<string>('');
 
-  // Fetch staff and bookings from Supabase
+  const { user: authUser, profile } = useAuth();
+  const userRole = (authUser?.role || profile?.role || '') as string;
+  const isAdminUser = userRole === 'admin';
+  const isManagerUser = isAdminUser || userRole === 'manager';
+
+  // Fetch staff and bookings from Firestore
   const fetchData = async () => {
-    if (!isSupabaseConfigured) {
-      try {
-        const localSaved = localStorage.getItem('musha_local_staff');
-        if (localSaved) {
-          setStaffList(JSON.parse(localSaved));
-        } else {
-          const defaultStaffList: DBStaff[] = STYLISTS_DATA.map((s, idx) => ({
-            id: s.id,
-            full_name: s.name,
-            email: '',
-            phone: '',
-            role: 'stylist',
-            is_active: true,
-            is_available: true,
-            employee_code: `EMP-${1000 + idx}`,
-            image_url: s.image,
-            bio: s.bio,
-            specialty: s.specialty,
-            created_at: new Date().toISOString()
-          }));
-          setStaffList(defaultStaffList);
-          localStorage.setItem('musha_local_staff', JSON.stringify(defaultStaffList));
-        }
-        setBookings([]);
-      } catch (err) {
-        console.warn('Notice restoring local staff registry:', err);
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
+    setLoading(true);
     try {
-      setLoading(true);
-      const { data: staffData, error: staffErr } = await supabase
-        .from('staff')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // 1. Fetch live staff users from Firestore
+      const firestoreStaff = await usersRepository.getStaffUsers();
+      if (firestoreStaff && firestoreStaff.length > 0) {
+        const mappedStaff: DBStaff[] = firestoreStaff.map((u, idx) => ({
+          id: u.uid || u.id,
+          profile_id: u.uid || u.id,
+          full_name: u.fullName || u.full_name || 'Salon Artisan',
+          email: u.email || '',
+          phone: u.phone || '',
+          role: u.role || 'stylist',
+          is_active: u.isActive !== false && u.is_active !== false,
+          is_available: true,
+          employee_code: `EMP-${1000 + idx}`,
+          image_url: u.avatarUrl || u.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150',
+          bio: '',
+          specialty: 'Master Stylist & Artisan',
+          created_at: u.createdAt || u.created_at || new Date().toISOString()
+        }));
+        setStaffList(mappedStaff);
+      } else {
+        // Initial catalog stylists when no staff documents are populated yet
+        const defaultStaffList: DBStaff[] = STYLISTS_DATA.map((s, idx) => ({
+          id: s.id,
+          full_name: s.name,
+          email: `${s.name.toLowerCase().replace(/[^a-z]/g, '')}@mushaempire.com`,
+          phone: `+91 98765 0${100 + idx}`,
+          role: 'stylist',
+          is_active: true,
+          is_available: true,
+          employee_code: `EMP-${1000 + idx}`,
+          image_url: s.image,
+          bio: s.bio,
+          specialty: s.specialty,
+          created_at: new Date().toISOString()
+        }));
+        setStaffList(defaultStaffList);
+      }
 
-      if (staffErr) throw staffErr;
-      setStaffList(staffData || []);
+      // 2. Fetch real salon bookings from Firestore
+      const firestoreBookings = await bookingsRepository.getAll();
+      setBookings(firestoreBookings || []);
 
-      const { data: bookingData, error: bookingErr } = await supabase
-        .from('bookings')
-        .select('*');
-
-      if (bookingErr) throw bookingErr;
-      setBookings(bookingData || []);
+      // 3. Fetch all customer concierge requests from Firestore for review
+      const salonRequests = await conciergeRequestsRepository.getAll();
+      setConciergeRequests(salonRequests || []);
     } catch (err: any) {
-      console.warn('Notice fetching staff data:', err);
-      triggerToast('error', 'Fetch Notice', err.message || 'Could not synchronize staff lists with Supabase.');
+      console.warn('Notice fetching staff data from Firestore:', err);
+      triggerToast('error', 'Fetch Notice', 'Could not synchronize staff lists with Firestore.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleUpdateRequestStatus = async (requestId: string, newStatus: ConciergeRequestStatus) => {
+    setUpdatingRequestId(requestId);
+    try {
+      const staffName = authUser?.displayName || (authUser as any)?.fullName || (authUser as any)?.name || 'Salon Staff';
+      await conciergeRequestsRepository.updateStatus(requestId, newStatus, undefined, staffName);
+      setConciergeRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: newStatus, reviewed_by: staffName } : r));
+      triggerToast('success', 'Request Updated', `Concierge request #${requestId} marked as ${newStatus}.`);
+    } catch (err: any) {
+      console.warn('Notice updating concierge request status in Firestore:', err);
+      triggerToast('error', 'Update Failed', err.message || 'Could not update request status in Firestore.');
+    } finally {
+      setUpdatingRequestId(null);
+    }
+  };
+
   useEffect(() => {
     fetchData();
-
-    if (!isSupabaseConfigured) return;
-
-    // Subscribe to real-time updates for staff table
-    const channel = supabase
-      .channel('staff_mgmt_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, () => {
-        fetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
-        fetchData();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   // Compute Statistics
@@ -248,46 +255,15 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
 
     try {
       setUploadingImage(true);
-      const fileExt = file.name.split('.').pop();
-      const randomId = editingStaff?.id || crypto.randomUUID();
-      const fileName = `${randomId}-${Date.now()}.${fileExt}`;
-
-      // 1. Try to upload to "staff" storage bucket
-      const { data, error } = await supabase.storage
-        .from('staff')
-        .upload(fileName, file, { cacheControl: '3600', upsert: true });
-
-      if (error) {
-        console.warn('Bucket upload failed, attempting default "avatars" bucket...', error);
-        // Fallback to "avatars" bucket
-        const { data: avData, error: avError } = await supabase.storage
-          .from('avatars')
-          .upload(fileName, file, { cacheControl: '3600', upsert: true });
-
-        if (avError) throw avError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(fileName);
-        setImageUrl(publicUrl);
-        triggerToast('success', 'Image Upload Complete', 'Staff profile photo has been refreshed.');
-      } else {
-        const { data: { publicUrl } } = supabase.storage
-          .from('staff')
-          .getPublicUrl(fileName);
-        setImageUrl(publicUrl);
-        triggerToast('success', 'Image Upload Complete', 'Staff profile photo has been refreshed.');
-      }
-    } catch (err: any) {
-      console.warn('Supabase storage upload error, using local data URL fallback:', err);
-      // Fallback base64 conversion
       const reader = new FileReader();
       reader.onloadend = () => {
         setImageUrl(reader.result as string);
-        triggerToast('info', 'Image Cached', 'Photo converted to local asset URI.');
+        triggerToast('success', 'Image Upload Complete', 'Staff profile photo has been refreshed.');
+        setUploadingImage(false);
       };
       reader.readAsDataURL(file);
-    } finally {
+    } catch (err: any) {
+      console.warn('Image reader error:', err);
       setUploadingImage(false);
     }
   };
@@ -352,6 +328,21 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
       }
     }
 
+    // Enforce strict role-based access control:
+    if (editingStaff && editingStaff.role !== role) {
+      if (!isAdminUser) {
+        triggerToast('error', 'Permission Denied', 'Only salon administrators can modify staff role assignments.');
+        return;
+      }
+    }
+    // Prevent self-elevation of privileges:
+    if (authUser && authUser.id === editingStaff?.id && role !== (authUser.role || profile?.role)) {
+      if (!isAdminUser) {
+        triggerToast('error', 'Security Policy', 'Users cannot elevate their own role privileges.');
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       // Serialize schedule and leaves into the bio field as JSON
@@ -367,94 +358,64 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
         leaves
       });
 
-      const staffId = editingStaff?.id || crypto.randomUUID();
-      const payload: DBStaff = {
+      const staffId = editingStaff?.id || `staff_${Date.now()}`;
+      
+      // Save directly to Firestore users collection
+      await usersRepository.set({
         id: staffId,
+        uid: staffId,
+        fullName: fullName.trim(),
         full_name: fullName.trim(),
         email: email.trim(),
         phone: phone.trim(),
-        employee_code: employeeCode.trim(),
-        specialty: specialty.trim(),
-        role,
+        role: role as any,
+        avatarUrl: imageUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150',
+        avatar_url: imageUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150',
+        walletBalance: 0,
+        wallet_balance: 0,
+        loyaltyPoints: 0,
+        loyalty_points: 0,
+        membershipPlan: 'None',
+        membership_plan: 'None',
+        isActive,
         is_active: isActive,
-        is_available: isAvailable,
-        image_url: imageUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150',
-        bio: serializedBio
-      };
+        createdAt: editingStaff?.created_at || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
 
-      if (!isSupabaseConfigured) {
-        setStaffList(prev => {
-          const index = prev.findIndex(s => s.id === staffId);
-          let updated: DBStaff[];
-          if (index >= 0) {
-            updated = [...prev];
-            updated[index] = payload;
-          } else {
-            updated = [payload, ...prev];
-          }
-          try {
-            localStorage.setItem('musha_local_staff', JSON.stringify(updated));
-          } catch (e) {
-            console.warn('LocalStorage error:', e);
-          }
-          return updated;
-        });
-
-        triggerToast('success', editingStaff ? 'Stylist Updated' : 'Stylist Enrolled', `Successfully saved record for ${fullName}.`);
-        setIsModalOpen(false);
-        return;
-      }
-
-      const { error } = await supabase
-        .from('staff')
-        .upsert(payload);
-
-      if (error) throw error;
-
-      triggerToast('success', editingStaff ? 'Stylist Updated' : 'Stylist Enrolled', `Successfully saved record for ${fullName}.`);
+      triggerToast('success', editingStaff ? 'Stylist Updated' : 'Stylist Enrolled', `Successfully saved Firestore record for ${fullName}.`);
       setIsModalOpen(false);
       fetchData();
     } catch (err: any) {
       console.warn('Notice saving staff:', err);
-      triggerToast('error', 'Save Notice', err.message || 'Could not write records to database.');
+      triggerToast('error', 'Save Notice', err.message || 'Could not write records to Firestore.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Delete a staff record
+  // Delete / retire a staff record in Firestore
   const handleDeleteStaff = async (staffId: string, name: string) => {
+    if (!isManagerUser) {
+      triggerToast('error', 'Permission Denied', 'Only managers or administrators can retire staff members.');
+      return;
+    }
+
     if (!confirm(`Are you absolutely sure you want to retire ${name} from active staff registries?`)) {
       return;
     }
 
     try {
-      if (!isSupabaseConfigured) {
-        setStaffList(prev => {
-          const updated = prev.filter(s => s.id !== staffId);
-          try {
-            localStorage.setItem('musha_local_staff', JSON.stringify(updated));
-          } catch (e) {
-            console.warn('LocalStorage error:', e);
-          }
-          return updated;
-        });
-        triggerToast('success', 'Stylist Retired', `Successfully removed ${name} from the salon registries.`);
-        return;
-      }
+      await usersRepository.update(staffId, {
+        isActive: false,
+        is_active: false
+      });
 
-      const { error } = await supabase
-        .from('staff')
-        .delete()
-        .eq('id', staffId);
-
-      if (error) throw error;
-
-      triggerToast('success', 'Stylist Retired', `Successfully removed ${name} from the salon registries.`);
+      triggerToast('success', 'Stylist Retired', `Successfully updated status in Firestore for ${name}.`);
       fetchData();
     } catch (err: any) {
-      console.warn('Notice deleting staff:', err);
-      triggerToast('error', 'Deletion Notice', err.message || 'Could not delete staff record.');
+      console.warn('Notice retiring staff:', err);
+      triggerToast('error', 'Retire Error', err.message || 'Could not update staff status in Firestore.');
     }
   };
 
@@ -509,26 +470,178 @@ export default function StaffManagement({ id, triggerToast }: StaffManagementPro
             <Users className="h-5 w-5 text-brand-secondary" /> Staff & Artist Management
           </h2>
           <p className="font-sans text-xs text-brand-text-muted mt-1 leading-relaxed max-w-xl">
-            Configure working schedules, lock leaves, and upload premium styling portraits. Staff settings act as the single source of truth for public display lists and active client calendars.
+            Configure working schedules, review real patron concierge requests, and update staff rosters.
           </p>
         </div>
-        <Button
-          id="add-stylist-btn"
-          variant="primary"
-          size="sm"
-          onClick={() => handleOpenModal(null)}
-          leftIcon={<Plus className="h-4 w-4" />}
-          className="font-sans text-xs uppercase tracking-widest font-bold self-stretch sm:self-auto shrink-0"
-        >
-          Enroll Stylist
-        </Button>
+        {activeSubTab === 'staff' && (
+          <Button
+            id="add-stylist-btn"
+            variant="primary"
+            size="sm"
+            onClick={() => handleOpenModal(null)}
+            leftIcon={<Plus className="h-4 w-4" />}
+            className="font-sans text-xs uppercase tracking-widest font-bold self-stretch sm:self-auto shrink-0"
+          >
+            Enroll Stylist
+          </Button>
+        )}
       </div>
 
-      {/* 3. Main Staff List Grid */}
+      {/* 2b. View Subtabs */}
+      <div className="flex border-b border-brand-accent">
+        <button
+          id="staff-subtab-artists"
+          onClick={() => setActiveSubTab('staff')}
+          className={`py-3 px-6 font-sans text-xs uppercase tracking-widest font-semibold border-b-2 transition-all cursor-pointer ${
+            activeSubTab === 'staff'
+              ? 'border-brand-secondary text-brand-primary bg-brand-surface font-bold'
+              : 'border-transparent text-brand-text-muted hover:text-brand-primary'
+          }`}
+        >
+          Stylists & Artists ({staffList.length})
+        </button>
+        <button
+          id="staff-subtab-requests"
+          onClick={() => setActiveSubTab('requests')}
+          className={`py-3 px-6 font-sans text-xs uppercase tracking-widest font-semibold border-b-2 transition-all cursor-pointer ${
+            activeSubTab === 'requests'
+              ? 'border-brand-secondary text-brand-primary bg-brand-surface font-bold'
+              : 'border-transparent text-brand-text-muted hover:text-brand-primary'
+          }`}
+        >
+          Customer Concierge Requests ({conciergeRequests.length})
+        </button>
+      </div>
+
+      {/* 3. Main Staff List Grid or Concierge Requests Review View */}
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center gap-4 bg-brand-surface/30 border border-brand-accent">
           <div className="h-8 w-8 border-2 border-brand-secondary border-t-brand-surface rounded-full animate-spin" />
           <p className="font-sans text-[10px] uppercase tracking-widest text-brand-secondary">Synchronizing registries...</p>
+        </div>
+      ) : activeSubTab === 'requests' ? (
+        <div className="space-y-4">
+          {conciergeRequests.length === 0 ? (
+            <div className="py-16 text-center bg-brand-surface border border-brand-accent">
+              <Calendar className="h-10 w-10 text-brand-secondary mx-auto mb-3" />
+              <h3 className="font-serif text-lg text-white font-medium">No Customer Concierge Requests</h3>
+              <p className="font-sans text-xs text-brand-text-muted mt-1.5 max-w-sm mx-auto">
+                Real customer reservation requests submitted by patrons via the booking wizard will appear here for front-desk review and schedule confirmation.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {conciergeRequests.map((req) => {
+                const statusColor =
+                  req.status === 'completed'
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                    : req.status === 'reviewed'
+                    ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
+                    : req.status === 'contacted'
+                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                    : req.status === 'cancelled'
+                    ? 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+
+                const isBusy = updatingRequestId === req.id;
+
+                return (
+                  <Card id={`concierge-req-card-${req.id}`} key={req.id} variant="bordered" className="bg-brand-surface border-brand-accent p-6 space-y-4 relative">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-brand-secondary font-bold block">
+                          REF #{req.id}
+                        </span>
+                        <h4 className="font-serif text-lg font-bold text-white mt-1">
+                          {req.customer_name || 'Valued Patron'}
+                        </h4>
+                        <div className="text-xs font-sans text-brand-text-muted space-y-0.5 mt-1">
+                          {req.customer_phone && <p>📞 {req.customer_phone}</p>}
+                          {req.customer_email && <p>✉️ {req.customer_email}</p>}
+                        </div>
+                      </div>
+                      <span className={`font-mono text-[8px] uppercase px-2 py-0.5 border ${statusColor}`}>
+                        {req.status}
+                      </span>
+                    </div>
+
+                    <div className="bg-brand-bg/60 p-3 border border-brand-accent/30 space-y-1.5 text-xs font-sans">
+                      <div className="flex justify-between text-brand-text-muted">
+                        <span>Ritual:</span>
+                        <span className="font-semibold text-white">{req.service_name} ({req.gender})</span>
+                      </div>
+                      <div className="flex justify-between text-brand-text-muted">
+                        <span>Requested Time:</span>
+                        <span className="font-semibold text-white">{req.booking_date} at {req.start_time}</span>
+                      </div>
+                      <div className="flex justify-between text-brand-text-muted">
+                        <span>Price Quote:</span>
+                        <span className="font-serif font-bold text-brand-gold-dark">${req.total_amount}</span>
+                      </div>
+                      {req.notes && (
+                        <div className="pt-1 text-[11px] italic text-brand-text-muted border-t border-brand-accent/20">
+                          Notes: "{req.notes}"
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Staff Actions */}
+                    <div className="pt-2 border-t border-brand-accent/30 flex flex-wrap gap-2 items-center">
+                      <span className="font-sans text-[10px] uppercase tracking-wider text-brand-text-muted mr-1">Review:</span>
+                      <Button
+                        id={`btn-review-${req.id}`}
+                        variant="outline"
+                        size="sm"
+                        disabled={isBusy}
+                        onClick={() => handleUpdateRequestStatus(req.id, 'reviewed')}
+                        className={`text-[10px] uppercase font-sans px-2.5 py-1 ${
+                          req.status === 'reviewed' ? 'border-sky-500 text-sky-400' : 'border-brand-accent text-brand-text-muted'
+                        }`}
+                      >
+                        Reviewed
+                      </Button>
+                      <Button
+                        id={`btn-contact-${req.id}`}
+                        variant="outline"
+                        size="sm"
+                        disabled={isBusy}
+                        onClick={() => handleUpdateRequestStatus(req.id, 'contacted')}
+                        className={`text-[10px] uppercase font-sans px-2.5 py-1 ${
+                          req.status === 'contacted' ? 'border-purple-500 text-purple-400' : 'border-brand-accent text-brand-text-muted'
+                        }`}
+                      >
+                        Contacted
+                      </Button>
+                      <Button
+                        id={`btn-complete-${req.id}`}
+                        variant="outline"
+                        size="sm"
+                        disabled={isBusy}
+                        onClick={() => handleUpdateRequestStatus(req.id, 'completed')}
+                        className={`text-[10px] uppercase font-sans px-2.5 py-1 ${
+                          req.status === 'completed' ? 'border-emerald-500 text-emerald-400' : 'border-brand-accent text-brand-text-muted'
+                        }`}
+                      >
+                        Complete
+                      </Button>
+                      <Button
+                        id={`btn-cancel-${req.id}`}
+                        variant="outline"
+                        size="sm"
+                        disabled={isBusy}
+                        onClick={() => handleUpdateRequestStatus(req.id, 'cancelled')}
+                        className={`text-[10px] uppercase font-sans px-2.5 py-1 ${
+                          req.status === 'cancelled' ? 'border-red-500 text-red-400' : 'border-brand-accent text-brand-text-muted'
+                        }`}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : staffList.length === 0 ? (
         <div className="py-16 text-center bg-brand-surface border border-brand-accent">

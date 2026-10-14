@@ -50,7 +50,9 @@ import DashboardMembership from './DashboardMembership';
 import DashboardProfileAndSettings from './DashboardProfileAndSettings';
 import DashboardNotifications from './DashboardNotifications';
 import DashboardReviews from './DashboardReviews';
+import StaffManagement from './StaffManagement';
 import MushaEmpireLogo from '../ui/MushaEmpireLogo';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface DashboardModuleProps {
   id: string;
@@ -88,6 +90,10 @@ const DEFAULT_REWARDS: LoyaltyRewardItem[] = [];
 const DEFAULT_NOTIFICATIONS: DashboardNotification[] = [];
 
 export default function DashboardModule({ id, onLogout, triggerToast, userProfile }: DashboardModuleProps) {
+  const { user: authUser, profile } = useAuth();
+  const userRole = authUser?.role || profile?.role || 'customer';
+  const isStaffUser = ['admin', 'manager', 'receptionist', 'stylist', 'cashier', 'staff'].includes(userRole);
+
   const [currentView, setCurrentView] = useState<DashboardViewType>('overview');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isAvatarDropdownOpen, setIsAvatarDropdownOpen] = useState(false);
@@ -442,15 +448,18 @@ export default function DashboardModule({ id, onLogout, triggerToast, userProfil
     fetchSupabaseProfileAndData();
   }, [userProfile, refreshTrigger]);
 
-  // Synchronize appointments with live Firestore / Supabase database
+  // Synchronize appointments with live Firestore database
   useEffect(() => {
     let isMounted = true;
     
     const fetchBookings = async () => {
-      // 1. Authoritative Firestore sync
       if (isFirebaseConfigured && auth?.currentUser) {
         try {
-          const fbBookings = await bookingsRepository.getMyBookings(auth.currentUser.uid);
+          // Authorized staff/admin can view all salon bookings; customers only view their own records
+          const fbBookings = isStaffUser
+            ? await bookingsRepository.getAll()
+            : await bookingsRepository.getMyBookings(auth.currentUser.uid);
+
           if (isMounted) {
             if (fbBookings && fbBookings.length > 0) {
               const mapped: DashboardAppointment[] = fbBookings.map((b) => {
@@ -479,96 +488,21 @@ export default function DashboardModule({ id, onLogout, triggerToast, userProfil
             } else {
               setAppointments([]);
             }
-            return;
           }
         } catch (err) {
           console.warn('Notice reading bookings from Firestore in dashboard:', err);
         }
       }
-
-      if (!isSupabaseConfigured) return;
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser) return;
-
-        // Fetch user bookings from Supabase
-        const { data: dbBookings, error: bErr } = await supabase
-          .from('bookings')
-          .select('*')
-          .eq('customer_id', authUser.id)
-          .order('created_at', { ascending: false });
-
-        if (bErr) throw bErr;
-
-        // Fetch companion tables for in-memory mapping to avoid nested relation failures
-        const { data: dbServices } = await supabase.from('services').select('*');
-        const { data: dbStaff } = await supabase.from('staff').select('*');
-        const { data: dbBookingServices } = await supabase.from('booking_services').select('*');
-
-        if (!dbBookings || dbBookings.length === 0) {
-          return;
-        }
-
-        const servicesList = dbServices || [];
-        const staffList = dbStaff || [];
-        const bookingServicesList = dbBookingServices || [];
-
-        // Map database records to exact DashboardAppointment structures
-        const mappedAppointments: DashboardAppointment[] = dbBookings.map((b) => {
-          // Find associated service in booking_services
-          const bServices = bookingServicesList.filter((bs) => bs.booking_id === b.id);
-          const firstServiceId = bServices[0]?.service_id;
-          
-          const service = servicesList.find((s) => s.id === firstServiceId);
-          const localService = EXTENDED_SERVICES_DATA.find(s => s.id === firstServiceId || s.name.toLowerCase() === service?.name?.toLowerCase());
-          
-          const serviceName = service?.name || localService?.name || 'Empire Hair & Scalp Nourish';
-          const category = localService?.category || 'Exclusive';
-          const duration = service?.duration_minutes ? `${service.duration_minutes} Mins` : localService?.duration || '60 Mins';
-          const price = typeof b.total_amount === 'number' ? b.total_amount : parseFloat(b.total_amount) || localService?.priceValue || 95;
-
-          // Find stylist
-          const stylist = staffList.find((s) => s.id === b.staff_id);
-          const stylistName = stylist?.full_name || 'Salon Concierge';
-          const stylistAvatar = stylist?.image_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100';
-
-          return {
-            id: b.id,
-            serviceId: firstServiceId || 'hair-spa-1',
-            serviceName,
-            category,
-            stylistName,
-            stylistAvatar,
-            date: b.booking_date,
-            timeSlot: b.start_time,
-            price,
-            duration,
-            status: b.status === 'cancelled' ? 'cancelled' : (b.status === 'completed' ? 'completed' : 'upcoming'),
-            paymentStatus: b.status === 'cancelled' ? 'refunded' : 'paid',
-            qrCodeUrl: '#qr-code-placeholder',
-            invoiceUrl: '#invoice-download',
-            realStatus: b.status as any
-          };
-        });
-
-        if (isMounted) {
-          setAppointments(mappedAppointments);
-        }
-      } catch (err) {
-        console.error('Error synchronizing database bookings with dashboard:', err);
-      }
     };
 
     fetchBookings();
-
-    // Set up polling interval for instant booking display synchronization
-    const interval = setInterval(fetchBookings, 8000);
+    const interval = setInterval(fetchBookings, 15000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, isStaffUser]);
 
   useEffect(() => {
     localStorage.setItem('musha_db_transactions', JSON.stringify(transactions));
@@ -1066,6 +1000,9 @@ export default function DashboardModule({ id, onLogout, triggerToast, userProfil
   const sidebarLinks = [
     { id: 'overview' as const, label: 'Overview', icon: LayoutDashboard },
     { id: 'appointments' as const, label: 'Upcoming sessions', icon: Calendar },
+    ...(isStaffUser ? [
+      { id: 'staff' as const, label: 'Staff & Team CMS', icon: Users }
+    ] : []),
     { id: 'wallet' as const, label: 'Wallet balance', icon: Wallet },
     { id: 'rewards' as const, label: 'Patron rewards', icon: Award },
     { id: 'membership' as const, label: 'Privilege lounge', icon: Crown },
@@ -1372,6 +1309,13 @@ export default function DashboardModule({ id, onLogout, triggerToast, userProfil
                   onUpdateUser={handleUpdateUser}
                   onAddAddress={handleAddAddress}
                   onDeleteAddress={handleDeleteAddress}
+                  triggerToast={triggerToast}
+                />
+              )}
+
+              {currentView === 'staff' && isStaffUser && (
+                <StaffManagement
+                  id="portal-staff"
                   triggerToast={triggerToast}
                 />
               )}

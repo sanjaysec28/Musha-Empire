@@ -24,8 +24,8 @@ import {
 import { DashboardAppointment } from './types';
 import Button from '../ui/Button';
 import { Modal } from '../ui/Overlay';
-import { settingsRepository } from '../../lib/firestoreService';
-import { FirestoreSalonSettings } from '../../types/firestore';
+import { settingsRepository, conciergeRequestsRepository } from '../../lib/firestoreService';
+import { FirestoreSalonSettings, FirestoreConciergeRequest } from '../../types/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { callCancelBooking, callRescheduleBooking, mapBookingError } from '../../lib/firebaseFunctions';
 
@@ -44,7 +44,10 @@ export default function DashboardAppointments({
   onRescheduleAppointment,
   triggerToast
 }: DashboardAppointmentsProps) {
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'requests' | 'completed' | 'cancelled'>('upcoming');
+  const [conciergeRequests, setConciergeRequests] = useState<FirestoreConciergeRequest[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const { user: authUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStylist, setSelectedStylist] = useState('all');
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'price-desc' | 'price-asc'>('date-asc');
@@ -68,6 +71,25 @@ export default function DashboardAppointments({
     });
     return () => { isMounted = false; };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchRequests = async () => {
+      const uid = authUser?.uid || (authUser as any)?.id;
+      if (!uid) return;
+      setLoadingRequests(true);
+      try {
+        const reqs = await conciergeRequestsRepository.getMyRequests(uid);
+        if (isMounted) setConciergeRequests(reqs);
+      } catch (err) {
+        console.warn('Notice reading my concierge requests:', err);
+      } finally {
+        if (isMounted) setLoadingRequests(false);
+      }
+    };
+    fetchRequests();
+    return () => { isMounted = false; };
+  }, [authUser]);
 
   // Extract list of stylists for filtering
   const stylists = Array.from(new Set(appointments.map((app) => app.stylistName)));
@@ -280,30 +302,128 @@ export default function DashboardAppointments({
       </div>
 
       {/* Primary Navigation Tabs */}
-      <div className="flex border-b border-brand-accent">
-        {(['upcoming', 'completed', 'cancelled'] as const).map((tab) => {
+      <div className="flex border-b border-brand-accent overflow-x-auto">
+        {(['upcoming', 'requests', 'completed', 'cancelled'] as const).map((tab) => {
           const isActive = activeTab === tab;
-          const count = appointments.filter((app) => app.status === tab).length;
+          const count = tab === 'requests'
+            ? conciergeRequests.length
+            : appointments.filter((app) => app.status === tab).length;
+          const label = tab === 'requests' ? 'Concierge Requests' : tab;
           return (
             <button
               key={tab}
               id={`tab-appointments-${tab}`}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-4 font-sans text-xs uppercase tracking-widest font-semibold border-b-2 text-center transition-all cursor-pointer ${
+              className={`flex-1 min-w-[120px] py-4 font-sans text-xs uppercase tracking-widest font-semibold border-b-2 text-center transition-all cursor-pointer ${
                 isActive
                   ? 'border-brand-secondary text-brand-primary bg-brand-surface font-bold'
                   : 'border-transparent text-brand-text-muted hover:text-brand-primary'
               }`}
             >
-              {tab} ({count})
+              {label} ({count})
             </button>
           );
         })}
       </div>
 
-      {/* Appointment Timeline List */}
+      {/* Appointment Timeline List or Concierge Requests List */}
       <div className="space-y-4">
-        {sortedAppointments.length > 0 ? (
+        {activeTab === 'requests' ? (
+          conciergeRequests.length > 0 ? (
+            <div className="space-y-4">
+              {conciergeRequests.map((req) => {
+                const statusColor =
+                  req.status === 'completed'
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                    : req.status === 'reviewed'
+                    ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
+                    : req.status === 'contacted'
+                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                    : req.status === 'cancelled'
+                    ? 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+
+                const statusLabel =
+                  req.status === 'completed'
+                    ? 'Converted to Appointment'
+                    : req.status === 'reviewed'
+                    ? 'Reviewed by Desk'
+                    : req.status === 'contacted'
+                    ? 'Patron Contacted'
+                    : req.status === 'cancelled'
+                    ? 'Cancelled'
+                    : 'Awaiting Concierge Confirmation';
+
+                return (
+                  <motion.div
+                    key={req.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="bg-brand-surface border border-brand-accent p-6 hover:border-brand-secondary/40 transition-all duration-300 relative group"
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400" />
+
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[9px] uppercase tracking-wider text-brand-secondary font-bold">
+                            #{req.id}
+                          </span>
+                          <span className={`font-mono text-[8px] uppercase px-2 py-0.5 border ${statusColor}`}>
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <h4 className="font-serif text-lg font-medium text-brand-primary">
+                          {req.service_name || 'Sanctuary Ritual'}
+                        </h4>
+                        <div className="flex flex-wrap gap-4 text-xs font-sans text-brand-text-muted">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5 text-brand-secondary" /> {req.booking_date}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5 text-brand-secondary" /> {req.start_time} {req.end_time ? `– ${req.end_time}` : ''}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <User className="h-3.5 w-3.5 text-brand-secondary" /> {req.gender || 'Grooming'}
+                          </span>
+                        </div>
+                        {req.notes && (
+                          <p className="font-sans text-[11px] text-brand-text-muted italic bg-brand-bg/40 p-2 border border-brand-accent/20">
+                            Note: "{req.notes}"
+                          </p>
+                        )}
+                        <p className="font-sans text-[11px] text-brand-text-muted">
+                          Registered Concierge Request • Quote reference <strong className="text-brand-primary font-mono font-bold">#{req.id}</strong> to salon front-desk to finalize timing.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <span className="font-serif text-xl font-bold text-brand-gold-dark">
+                          ${req.total_amount}
+                        </span>
+                        <span className="font-sans text-[10px] text-brand-text-muted uppercase tracking-wider">
+                          Pay upon salon arrival
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-brand-surface border border-dashed border-brand-accent p-12 text-center flex flex-col items-center justify-center min-h-[260px]">
+              <div className="h-12 w-12 rounded-none bg-brand-surface-muted flex items-center justify-center text-brand-text-muted mb-4 border border-brand-accent">
+                <Clock className="h-5 w-5" />
+              </div>
+              <p className="font-serif text-lg font-medium text-brand-primary">No Concierge Requests Logged</p>
+              <p className="font-sans text-xs text-brand-text-muted max-w-sm mt-1.5">
+                When you initiate a scheduling request through the reservations desk, your requests will appear here with live review tracking and front-desk reference codes.
+              </p>
+            </div>
+          )
+        ) : sortedAppointments.length > 0 ? (
           <div className="space-y-4">
             {sortedAppointments.map((app) => (
               <motion.div

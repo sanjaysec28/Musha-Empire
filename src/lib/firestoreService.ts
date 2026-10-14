@@ -29,7 +29,9 @@ import {
   PublicSlotAvailability,
   PublicSlotStatus,
   FirestoreTicket,
-  BookingStatus
+  BookingStatus,
+  FirestoreConciergeRequest,
+  ConciergeRequestStatus
 } from '../types/firestore';
 
 /**
@@ -124,6 +126,19 @@ export const usersRepository = {
     } catch (err) {
       console.warn('Notice ensuring user profile in Firestore:', err);
       return null;
+    }
+  },
+
+  async getStaffUsers(): Promise<FirestoreUser[]> {
+    if (!isFirebaseConfigured || !db) return [];
+    try {
+      const coll = collection(db, 'users').withConverter(genericConverter<FirestoreUser>());
+      const q = query(coll, where('role', 'in', ['admin', 'manager', 'receptionist', 'stylist', 'cashier', 'staff']));
+      const snapshots = await getDocs(q);
+      return snapshots.docs.map(d => d.data());
+    } catch (err) {
+      console.warn('Notice reading staff users from Firestore:', err);
+      return [];
     }
   }
 };
@@ -395,6 +410,18 @@ export const bookingsRepository = {
     return bookingsRepository.serverCreateBooking(booking);
   },
 
+  async getAll(): Promise<FirestoreBooking[]> {
+    if (!isFirebaseConfigured || !db) return [];
+    try {
+      const coll = collection(db, 'bookings').withConverter(genericConverter<FirestoreBooking>());
+      const snapshots = await getDocs(coll);
+      return snapshots.docs.map(d => d.data());
+    } catch (err) {
+      console.warn('Notice reading all bookings for staff:', err);
+      return [];
+    }
+  },
+
   async updateStatus(bookingId: string, status: BookingStatus): Promise<void> {
     if (!isFirebaseConfigured || !db) return;
     const ref = doc(db, 'bookings', bookingId);
@@ -550,3 +577,62 @@ export const ticketsRepository = {
     return ticketsRepository.serverCreateTicket(ticket);
   }
 };
+
+/* ----------------------------------------------------------------------------
+ * 9. CONCIERGE REQUESTS REPOSITORY
+ * ------------------------------------------------------------------------- */
+export const conciergeRequestsRepository = {
+  async create(request: FirestoreConciergeRequest): Promise<void> {
+    if (!isFirebaseConfigured || !db) return;
+    const ref = doc(db, 'concierge_requests', request.id).withConverter(genericConverter<FirestoreConciergeRequest>());
+    await setDoc(ref, request);
+  },
+
+  async getMyRequests(customerId: string): Promise<FirestoreConciergeRequest[]> {
+    if (!isFirebaseConfigured || !db || !customerId) return [];
+    try {
+      const coll = collection(db, 'concierge_requests').withConverter(genericConverter<FirestoreConciergeRequest>());
+      const q = query(coll, where('customer_id', '==', customerId));
+      const snapshots = await getDocs(q);
+      if (snapshots.empty) {
+        const qFallback = query(coll, where('customerId', '==', customerId));
+        const fallbackSnaps = await getDocs(qFallback);
+        return fallbackSnaps.docs.map(d => d.data());
+      }
+      return snapshots.docs.map(d => d.data());
+    } catch (err) {
+      console.warn('Notice reading customer concierge requests:', err);
+      return [];
+    }
+  },
+
+  async getAll(): Promise<FirestoreConciergeRequest[]> {
+    if (!isFirebaseConfigured || !db) return [];
+    try {
+      const coll = collection(db, 'concierge_requests').withConverter(genericConverter<FirestoreConciergeRequest>());
+      const snapshots = await getDocs(coll);
+      return snapshots.docs.map(d => d.data());
+    } catch (err) {
+      console.warn('Notice reading salon concierge requests for staff:', err);
+      return [];
+    }
+  },
+
+  async updateStatus(
+    requestId: string,
+    status: ConciergeRequestStatus,
+    staffNotes?: string,
+    staffName?: string
+  ): Promise<void> {
+    if (!isFirebaseConfigured || !db) return;
+    const ref = doc(db, 'concierge_requests', requestId);
+    const updatePayload: Record<string, any> = {
+      status,
+      updated_at: new Date().toISOString()
+    };
+    if (staffNotes !== undefined) updatePayload.staff_notes = staffNotes;
+    if (staffName !== undefined) updatePayload.reviewed_by = staffName;
+    await updateDoc(ref, updatePayload);
+  }
+};
+

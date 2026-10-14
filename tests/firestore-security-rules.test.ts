@@ -262,6 +262,25 @@ describe('Production Firestore Security Rules Audit & Logic Verification', () =>
       return evalIsManagement(auth, dbState);
     }
 
+    // Concierge Requests rules
+    function evalConciergeRequestRead(reqDoc: Record<string, any>, auth?: AuthContext, dbState?: DatabaseState): boolean {
+      if (!evalIsAuthenticated(auth)) return false;
+      if (evalIsStaff(auth, dbState)) return true;
+      return reqDoc.customer_id === auth?.uid || reqDoc.customerId === auth?.uid;
+    }
+
+    function evalConciergeRequestCreate(reqData: Record<string, any>, auth?: AuthContext): boolean {
+      if (!evalIsAuthenticated(auth)) return false;
+      const isOwner = reqData.customer_id === auth?.uid || reqData.customerId === auth?.uid;
+      if (!isOwner) return false;
+      const status = reqData.status;
+      return status === undefined || status === 'submitted' || status === 'pending';
+    }
+
+    function evalConciergeRequestUpdate(auth?: AuthContext, dbState?: DatabaseState): boolean {
+      return evalIsStaff(auth, dbState);
+    }
+
     // Test cases
     const authAdmin: AuthContext = { uid: 'u_admin', token: { role: 'admin' } };
     const authManager: AuthContext = { uid: 'u_mgr', token: { role: 'manager' } };
@@ -488,5 +507,43 @@ describe('Production Firestore Security Rules Audit & Logic Verification', () =>
       expect(signatures.has('public_availability::date:ASCENDING,start_time:ASCENDING')).toBe(true);
       expect(signatures.has('public_availability::date:ASCENDING,status:ASCENDING,start_time:ASCENDING')).toBe(true);
     });
+
+    it('15. Concierge requests collection enforces customer privacy and authorized staff review access', () => {
+      expect(rulesContent).toContain('match /concierge_requests/{requestId}');
+
+      const myReqDoc = { customer_id: 'u_cust', status: 'submitted' };
+      const otherReqDoc = { customer_id: 'u_other_cust', status: 'submitted' };
+
+      // 1. Unauthenticated users cannot read or create requests
+      expect(evalConciergeRequestRead(myReqDoc, authUnauth)).toBe(false);
+      expect(evalConciergeRequestCreate(myReqDoc, authUnauth)).toBe(false);
+
+      // 2. Customer can read ONLY their own request
+      expect(evalConciergeRequestRead(myReqDoc, authCustomer)).toBe(true);
+      expect(evalConciergeRequestRead(otherReqDoc, authCustomer)).toBe(false);
+
+      // 3. Customer can create ONLY their own request with submitted/pending status
+      expect(evalConciergeRequestCreate({ customer_id: 'u_cust', status: 'submitted' }, authCustomer)).toBe(true);
+      expect(evalConciergeRequestCreate({ customer_id: 'u_other_cust', status: 'submitted' }, authCustomer)).toBe(false);
+      expect(evalConciergeRequestCreate({ customer_id: 'u_cust', status: 'completed' }, authCustomer)).toBe(false);
+
+      // 4. Staff/admin can read salon-wide requests and update status
+      expect(evalConciergeRequestRead(myReqDoc, authStylist)).toBe(true);
+      expect(evalConciergeRequestRead(otherReqDoc, authReceptionist)).toBe(true);
+      expect(evalConciergeRequestRead(otherReqDoc, authManager)).toBe(true);
+      expect(evalConciergeRequestRead(otherReqDoc, authAdmin)).toBe(true);
+
+      expect(evalConciergeRequestUpdate(authCustomer)).toBe(false);
+      expect(evalConciergeRequestUpdate(authStylist)).toBe(true);
+      expect(evalConciergeRequestUpdate(authManager)).toBe(true);
+      expect(evalConciergeRequestUpdate(authAdmin)).toBe(true);
+
+      // 5. Protected bookings, slots, availability, tickets remain strictly blocked for client writes
+      expect(evalBookingWrite()).toBe(false);
+      expect(evalSlotWrite()).toBe(false);
+      expect(evalPublicAvailabilityWrite()).toBe(false);
+      expect(evalTicketWrite()).toBe(false);
+    });
   });
 });
+
