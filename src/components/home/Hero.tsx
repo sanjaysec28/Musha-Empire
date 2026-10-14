@@ -5,6 +5,7 @@
 
 import { motion } from 'motion/react';
 import { Calendar, ArrowRight, Award } from 'lucide-react';
+const HERO_IMAGE_SRC = '/images/musha_luxury_salon_interior.png';
 
 export interface HeroProps {
   onBookClick?: () => void;
@@ -52,10 +53,10 @@ export default function Hero({ onBookClick, onExploreClick }: HeroProps) {
         {/* Cinematic Unisex Salon Interior Background */}
         <div className="absolute inset-0 z-0">
           <motion.img
-            src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1000&q=80"
-            alt="Musha Empire Luxury Unisex Salon & Spa"
+            src={HERO_IMAGE_SRC}
+            alt="Musha Empire Luxury Salon Interior"
             referrerPolicy="no-referrer"
-            className="w-full h-full object-cover object-[center_35%]"
+            className="w-full h-full object-cover object-center sm:object-[center_35%]"
             animate={{
               scale: [1, 1.03, 1],
             }}
@@ -203,10 +204,10 @@ export default function Hero({ onBookClick, onExploreClick }: HeroProps) {
         {/* Slowly Panning Background Image - Unisex Salon Interior */}
         <div className="absolute inset-0 z-0">
           <motion.img
-            src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1600&q=80"
+            src={HERO_IMAGE_SRC}
             alt="Musha Empire Luxury Unisex Salon Interior"
             referrerPolicy="no-referrer"
-            className="w-full h-full object-cover object-[center_35%]"
+            className="w-full h-full object-cover object-center lg:object-[center_35%]"
             animate={{
               scale: [1, 1.04, 1],
             }}

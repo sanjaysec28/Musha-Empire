@@ -1,0 +1,306 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" style="background:#0c0d10;">
+  <defs>
+    <!-- Dark Marble & Ambient Background Gradients -->
+    <linearGradient id="wallBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#121316"/>
+      <stop offset="40%" stop-color="#0f1013"/>
+      <stop offset="100%" stop-color="#08080a"/>
+    </linearGradient>
+
+    <radialGradient id="floorGlow" cx="35%" cy="85%" r="65%">
+      <stop offset="0%" stop-color="#d4af37" stop-opacity="0.22"/>
+      <stop offset="40%" stop-color="#b89344" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#08080a" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="wallBacklight" cx="38%" cy="32%" r="45%">
+      <stop offset="0%" stop-color="#ffe3a3" stop-opacity="0.18"/>
+      <stop offset="50%" stop-color="#c5a880" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#0c0d10" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Metallic Gold 3D Gradients -->
+    <linearGradient id="gold3D" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff4d4"/>
+      <stop offset="25%" stop-color="#e8ca8c"/>
+      <stop offset="50%" stop-color="#b88f42"/>
+      <stop offset="75%" stop-color="#dfc282"/>
+      <stop offset="100%" stop-color="#8a6523"/>
+    </linearGradient>
+
+    <linearGradient id="goldLight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff8e7"/>
+      <stop offset="50%" stop-color="#d4af37"/>
+      <stop offset="100%" stop-color="#99772b"/>
+    </linearGradient>
+
+    <linearGradient id="goldTubeGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffecb3" stop-opacity="0.95"/>
+      <stop offset="50%" stop-color="#fffdf7" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffb74d" stop-opacity="0.85"/>
+    </linearGradient>
+
+    <!-- Chrome & Leather Gradients -->
+    <linearGradient id="chrome" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#666"/>
+      <stop offset="35%" stop-color="#fff"/>
+      <stop offset="65%" stop-color="#aaa"/>
+      <stop offset="100%" stop-color="#444"/>
+    </linearGradient>
+
+    <linearGradient id="blackLeather" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2a2b30"/>
+      <stop offset="50%" stop-color="#18191c"/>
+      <stop offset="100%" stop-color="#0e0f12"/>
+    </linearGradient>
+
+    <linearGradient id="floorTiles" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1a1b1f"/>
+      <stop offset="100%" stop-color="#090a0c"/>
+    </linearGradient>
+
+    <!-- Filters for Bloom & Glow -->
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <filter id="deepGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+
+    <filter id="textShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="3" dy="5" stdDeviation="4" flood-color="#000" flood-opacity="0.85"/>
+    </filter>
+
+    <filter id="chairShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="15" flood-color="#000" flood-opacity="0.9"/>
+    </filter>
+  </defs>
+
+  <!-- 1. BASE ROOM & ARCHITECTURE -->
+  <rect width="1600" height="900" fill="url(#wallBg)"/>
+
+  <!-- Subtle Marble Veining in Background -->
+  <g opacity="0.12" stroke="#d4af37" stroke-width="1.2" fill="none">
+    <path d="M 50,0 Q 180,180 320,380 T 420,700"/>
+    <path d="M 400,0 Q 520,240 680,480 T 800,850"/>
+    <path d="M 220,120 Q 340,300 280,520 T 380,800"/>
+    <path d="M 850,50 Q 920,220 900,450 T 960,750"/>
+  </g>
+
+  <!-- Warm Feature Wall Backlight Glow -->
+  <rect x="0" y="0" width="1100" height="750" fill="url(#wallBacklight)"/>
+
+  <!-- Floor-Level Cove Light Wash -->
+  <ellipse cx="600" cy="730" rx="650" ry="140" fill="#ffb300" opacity="0.12" filter="url(#deepGlow)"/>
+
+  <!-- 2. FLOOR & REFLECTIONS -->
+  <path d="M 0,690 L 1600,690 L 1600,900 L 0,900 Z" fill="url(#floorTiles)"/>
+  <rect x="0" y="690" width="1600" height="210" fill="url(#floorGlow)"/>
+  <!-- Floor Tile Seams -->
+  <line x1="0" y1="780" x2="1600" y2="780" stroke="#25272e" stroke-width="1.5" opacity="0.4"/>
+  <line x1="0" y1="860" x2="1600" y2="860" stroke="#25272e" stroke-width="1.5" opacity="0.4"/>
+  <line x1="420" y1="690" x2="350" y2="900" stroke="#25272e" stroke-width="1.5" opacity="0.4"/>
+  <line x1="900" y1="690" x2="820" y2="900" stroke="#25272e" stroke-width="1.5" opacity="0.4"/>
+  <line x1="1350" y1="690" x2="1280" y2="900" stroke="#25272e" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- Protective Chair Mats on Floor -->
+  <rect x="620" y="740" width="310" height="65" rx="10" fill="#111215" stroke="#22242a" stroke-width="1" opacity="0.8"/>
+  <rect x="1000" y="740" width="310" height="65" rx="10" fill="#111215" stroke="#22242a" stroke-width="1" opacity="0.8"/>
+
+  <!-- 3. ARCHITECTURAL DETAILS ON LEFT (Vertical illuminated columns & reception) -->
+  <rect x="0" y="0" width="140" height="900" fill="#0b0b0e"/>
+  <!-- Vertical Warm Glowing Light Strips on Left Column -->
+  <rect x="42" y="0" width="6" height="530" fill="url(#goldTubeGlow)" filter="url(#softGlow)"/>
+  <rect x="42" y="0" width="6" height="530" fill="#fff" opacity="0.9"/>
+  <rect x="110" y="0" width="6" height="530" fill="url(#goldTubeGlow)" filter="url(#softGlow)"/>
+  <rect x="110" y="0" width="6" height="530" fill="#fff" opacity="0.9"/>
+
+  <!-- Marble Reception Counter Block at Lower Left -->
+  <path d="M 0,530 L 260,530 L 240,900 L 0,900 Z" fill="#131418" stroke="#1f2026" stroke-width="1"/>
+  <!-- Countertop Highlight Underglow -->
+  <line x1="0" y1="532" x2="260" y2="532" stroke="#d4af37" stroke-width="3" filter="url(#softGlow)"/>
+  <line x1="0" y1="532" x2="260" y2="532" stroke="#fff8e7" stroke-width="1.5"/>
+
+  <!-- Potted Tropical Plant beside Reception Desk -->
+  <g transform="translate(190, 420)">
+    <!-- Planter Pot -->
+    <path d="M 25,270 L 65,270 L 58,340 L 32,340 Z" fill="#16171b" stroke="#2b2d35" stroke-width="1"/>
+    <!-- Foliage / Fronds -->
+    <path d="M 45,270 Q 15,180 -30,195 Q -10,230 45,270 Z" fill="#1d3826" opacity="0.9"/>
+    <path d="M 45,270 Q 30,140 -10,130 Q 15,180 45,270 Z" fill="#254a32" opacity="0.95"/>
+    <path d="M 45,270 Q 75,130 115,145 Q 85,190 45,270 Z" fill="#1b3624" opacity="0.9"/>
+    <path d="M 45,270 Q 90,180 135,210 Q 95,240 45,270 Z" fill="#2a5238" opacity="0.92"/>
+    <path d="M 45,270 Q 50,110 55,80 Q 40,140 45,270 Z" fill="#316142" opacity="0.98"/>
+  </g>
+
+  <!-- 4. RIGHT SIDE: STYLING VANITY STATIONS, ARCHED MIRRORS & LIGHT TUBES -->
+  <!-- Background Display Shelving with Cosmetics -->
+  <rect x="880" y="160" width="130" height="420" fill="#121317" stroke="#25272e" stroke-width="1.5"/>
+  <!-- Shelf Rows & Glowing Products -->
+  <g fill="#c5a880" opacity="0.6">
+    <rect x="895" y="220" width="10" height="25" rx="1"/>
+    <rect x="910" y="215" width="12" height="30" rx="1" fill="#fff" opacity="0.7"/>
+    <rect x="928" y="222" width="10" height="23" rx="1"/>
+    <rect x="945" y="218" width="14" height="27" rx="1"/>
+    <rect x="965" y="220" width="10" height="25" rx="1"/>
+
+    <rect x="895" y="290" width="14" height="28" rx="1"/>
+    <rect x="915" y="285" width="11" height="33" rx="1" fill="#fff" opacity="0.7"/>
+    <rect x="932" y="292" width="13" height="26" rx="1"/>
+    <rect x="952" y="288" width="12" height="30" rx="1"/>
+
+    <rect x="895" y="360" width="12" height="28" rx="1"/>
+    <rect x="912" y="358" width="14" height="30" rx="1"/>
+    <rect x="932" y="355" width="12" height="33" rx="1" fill="#fff" opacity="0.7"/>
+    <rect x="950" y="362" width="10" height="26" rx="1"/>
+  </g>
+  <line x1="880" y1="250" x2="1010" y2="250" stroke="#333742" stroke-width="1.5"/>
+  <line x1="880" y1="320" x2="1010" y2="320" stroke="#333742" stroke-width="1.5"/>
+  <line x1="880" y1="390" x2="1010" y2="390" stroke="#333742" stroke-width="1.5"/>
+
+  <!-- Arched Brass Mirror 1 (Center-Right) -->
+  <g transform="translate(1080, 50)">
+    <!-- Mirror Brass Arch Frame -->
+    <path d="M 0,220 L 0,550 L 220,550 L 220,220 A 110,110 0 0,0 0,220 Z" fill="#14161a" stroke="url(#goldLight)" stroke-width="4" filter="url(#chairShadow)"/>
+    <!-- Mirror Reflective Surface with Warm Ambience -->
+    <path d="M 8,220 L 8,542 L 212,542 L 212,220 A 102,102 0 0,0 8,220 Z" fill="#1e2026" opacity="0.95"/>
+    <path d="M 8,220 A 102,102 0 0,1 212,220 L 130,542 L 8,542 Z" fill="#ffeec4" opacity="0.08"/>
+
+    <!-- Vertical Tubular Sconce Light on Mirror Frame -->
+    <rect x="-18" y="240" width="8" height="260" rx="4" fill="url(#goldTubeGlow)" filter="url(#softGlow)"/>
+    <rect x="-18" y="240" width="8" height="260" rx="4" fill="#ffffff" opacity="0.95"/>
+    <rect x="-21" y="235" width="14" height="8" rx="1" fill="url(#gold3D)"/>
+    <rect x="-21" y="497" width="14" height="8" rx="1" fill="url(#gold3D)"/>
+  </g>
+
+  <!-- Arched Brass Mirror 2 (Far Right Edge) -->
+  <g transform="translate(1380, 50)">
+    <path d="M 0,220 L 0,550 L 220,550 L 220,220 A 110,110 0 0,0 0,220 Z" fill="#14161a" stroke="url(#goldLight)" stroke-width="4"/>
+    <path d="M 8,220 L 8,542 L 212,542 L 212,220 A 102,102 0 0,0 8,220 Z" fill="#20232a" opacity="0.95"/>
+    <!-- Vertical Tubular Sconce Light on Mirror Frame -->
+    <rect x="-18" y="240" width="8" height="260" rx="4" fill="url(#goldTubeGlow)" filter="url(#softGlow)"/>
+    <rect x="-18" y="240" width="8" height="260" rx="4" fill="#ffffff" opacity="0.95"/>
+  </g>
+
+  <!-- Vanity Station Marble Countertop & Dark Wood Drawers -->
+  <g transform="translate(860, 590)">
+    <!-- Countertop White Marble Top -->
+    <rect x="0" y="0" width="740" height="28" fill="#e8eaed" stroke="#b0b4ba" stroke-width="1"/>
+    <rect x="0" y="28" width="740" height="180" fill="#16181d" stroke="#25272e" stroke-width="1"/>
+    <!-- Gold Drawer Pulls -->
+    <rect x="180" y="65" width="60" height="4" rx="2" fill="url(#gold3D)"/>
+    <rect x="420" y="65" width="60" height="4" rx="2" fill="url(#gold3D)"/>
+    <rect x="640" y="65" width="60" height="4" rx="2" fill="url(#gold3D)"/>
+    <!-- Vanity Bottles & Brushes on Countertop -->
+    <rect x="230" y="-35" width="14" height="35" rx="2" fill="#784b1d" opacity="0.9"/>
+    <rect x="250" y="-45" width="18" height="45" rx="2" fill="#1a1b1f" stroke="#444" stroke-width="1"/>
+    <rect x="275" y="-30" width="15" height="30" rx="2" fill="#d4af37" opacity="0.8"/>
+  </g>
+
+  <!-- 5. THE CENTERPIECE: 3D METALLIC GOLD MUSHA EMPIRE EMBLEM & SIGN -->
+  <g transform="translate(580, 240)" filter="url(#textShadow)">
+    <!-- 4-Pointed Radiant Gold Star / Fleur-de-lis Crest Top -->
+    <g transform="translate(0, -65)">
+      <polygon points="0,-32 8,-10 32,-3 10,8 0,32 -10,8 -32,-3 -8,-10" fill="url(#goldLight)"/>
+      <polygon points="0,-24 5,-7 24,-2 7,6 0,24 -7,6 -24,-2 -5,-7" fill="#fffdf5" opacity="0.85"/>
+      <circle cx="0" cy="0" r="4" fill="#ffd54f"/>
+    </g>
+
+    <!-- Stylized Serif 'M' Monogram Logo in 3D Metallic Gold -->
+    <g transform="translate(0, -10)">
+      <!-- 3D Bevel Edge Shadow -->
+      <path d="M -70,-2 M -70,30 L -50,30 L -50,-24 L -40,-24 L 0,16 L 40,-24 L 50,-24 L 50,30 L 70,30 L 70,-34 L 46,-34 L 0,10 L -46,-34 L -70,-34 Z" fill="#664614"/>
+      <!-- Main Metallic Face -->
+      <path d="M -70,30 L -52,30 L -52,-20 L -42,-20 L 0,20 L 42,-20 L 52,-20 L 52,30 L 70,30 L 70,-32 L 48,-32 L 0,14 L -48,-32 L -70,-32 Z" fill="url(#gold3D)"/>
+      <!-- Serif Flairs at Base of M -->
+      <polygon points="-76,30 -46,30 -52,24 -70,24" fill="url(#goldLight)"/>
+      <polygon points="46,30 76,30 70,24 52,24" fill="url(#goldLight)"/>
+    </g>
+
+    <!-- 'M U S H A' Brand Name in Grand Serif Lettering -->
+    <text x="0" y="90" font-family="'Playfair Display', Georgia, serif" font-size="76" font-weight="800" letter-spacing="14" fill="url(#gold3D)" text-anchor="middle">
+      MUSHA
+    </text>
+
+    <!-- '— E M P I R E —' Subheading with Flanking Thin Rules -->
+    <g transform="translate(0, 130)">
+      <line x1="-190" y1="-8" x2="-85" y2="-8" stroke="url(#goldLight)" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="0" y="0" font-family="'DM Sans', 'Manrope', sans-serif" font-size="24" font-weight="700" letter-spacing="16" fill="url(#goldLight)" text-anchor="middle">
+        EMPIRE
+      </text>
+      <line x1="85" y1="-8" x2="190" y2="-8" stroke="url(#goldLight)" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+
+    <!-- 'UNISEX SALON & SPA' in Crisp High-Grade Capitals -->
+    <text x="0" y="172" font-family="'DM Sans', 'Manrope', sans-serif" font-size="17" font-weight="600" letter-spacing="8" fill="#e8caa0" text-anchor="middle" opacity="0.95">
+      UNISEX SALON &amp; SPA
+    </text>
+  </g>
+
+  <!-- 6. LUXURY BLACK LEATHER SALON STYLING CHAIRS -->
+
+  <!-- CHAIR 1: Center-Left Styling Chair -->
+  <g transform="translate(770, 520)" filter="url(#chairShadow)">
+    <!-- Chrome Round Pedestal Base & Hydraulic Pump -->
+    <ellipse cx="0" cy="270" rx="90" ry="16" fill="url(#chrome)"/>
+    <rect x="-14" y="195" width="28" height="75" fill="url(#chrome)"/>
+    <circle cx="0" cy="270" r="16" fill="#1a1a1a"/>
+    <!-- Chrome Footrest Bar -->
+    <path d="M -45,210 L -45,235 L 45,235 L 45,210" fill="none" stroke="url(#chrome)" stroke-width="7" stroke-linecap="round"/>
+
+    <!-- Chair Seat Cushion Base -->
+    <rect x="-85" y="160" width="170" height="35" rx="14" fill="url(#blackLeather)" stroke="#3a3d46" stroke-width="1.5"/>
+    <line x1="-80" y1="172" x2="80" y2="172" stroke="#484c56" stroke-width="1.2" opacity="0.6"/>
+
+    <!-- Ergonomic Leather Backrest -->
+    <path d="M -75,60 C -75,40 -50,30 0,30 C 50,30 75,40 75,60 L 78,160 C 78,165 60,170 0,170 C -60,170 -78,165 -78,160 Z" fill="url(#blackLeather)" stroke="#3a3d46" stroke-width="2"/>
+    <!-- Subtle Cushion Contours & Highlights -->
+    <path d="M -55,60 C -55,45 -35,38 0,38 C 35,38 55,45 55,60 L 58,150 C 58,154 45,158 0,158 C -45,158 -58,154 -58,150 Z" fill="#1e2025" stroke="#2c2e35" stroke-width="1"/>
+
+    <!-- Left & Right Chrome Armrests with Padded Tops -->
+    <path d="M -90,95 L -90,165 L -75,165" fill="none" stroke="url(#chrome)" stroke-width="8" stroke-linecap="round"/>
+    <rect x="-96" y="85" width="24" height="15" rx="5" fill="#16171a"/>
+
+    <path d="M 90,95 L 90,165 L 75,165" fill="none" stroke="url(#chrome)" stroke-width="8" stroke-linecap="round"/>
+    <rect x="72" y="85" width="24" height="15" rx="5" fill="#16171a"/>
+  </g>
+
+  <!-- CHAIR 2: Center-Right Styling Chair -->
+  <g transform="translate(1120, 530)" filter="url(#chairShadow)">
+    <!-- Chrome Round Pedestal Base & Hydraulic Pump -->
+    <ellipse cx="0" cy="270" rx="90" ry="16" fill="url(#chrome)"/>
+    <rect x="-14" y="195" width="28" height="75" fill="url(#chrome)"/>
+    <!-- Chrome Footrest Bar -->
+    <path d="M -45,210 L -45,235 L 45,235 L 45,210" fill="none" stroke="url(#chrome)" stroke-width="7" stroke-linecap="round"/>
+
+    <!-- Chair Seat Cushion Base -->
+    <rect x="-85" y="160" width="170" height="35" rx="14" fill="url(#blackLeather)" stroke="#3a3d46" stroke-width="1.5"/>
+    <line x1="-80" y1="172" x2="80" y2="172" stroke="#484c56" stroke-width="1.2" opacity="0.6"/>
+
+    <!-- Ergonomic Leather Backrest -->
+    <path d="M -75,60 C -75,40 -50,30 0,30 C 50,30 75,40 75,60 L 78,160 C 78,165 60,170 0,170 C -60,170 -78,165 -78,160 Z" fill="url(#blackLeather)" stroke="#3a3d46" stroke-width="2"/>
+    <path d="M -55,60 C -55,45 -35,38 0,38 C 35,38 55,45 55,60 L 58,150 C 58,154 45,158 0,158 C -45,158 -58,154 -58,150 Z" fill="#1e2025" stroke="#2c2e35" stroke-width="1"/>
+
+    <!-- Chrome Armrests -->
+    <path d="M -90,95 L -90,165 L -75,165" fill="none" stroke="url(#chrome)" stroke-width="8" stroke-linecap="round"/>
+    <rect x="-96" y="85" width="24" height="15" rx="5" fill="#16171a"/>
+    <path d="M 90,95 L 90,165 L 75,165" fill="none" stroke="url(#chrome)" stroke-width="8" stroke-linecap="round"/>
+    <rect x="72" y="85" width="24" height="15" rx="5" fill="#16171a"/>
+  </g>
+
+  <!-- 7. CEILING TRACK LIGHTING FIXTURES (Top) -->
+  <rect x="0" y="0" width="1600" height="24" fill="#070709"/>
+  <!-- Track Light Fixtures -->
+  <g fill="#1a1c22">
+    <rect x="350" y="16" width="35" height="16" rx="3"/>
+    <ellipse cx="367" cy="32" rx="14" ry="4" fill="#ffe29a" opacity="0.8"/>
+    <rect x="620" y="16" width="35" height="16" rx="3"/>
+    <ellipse cx="637" cy="32" rx="14" ry="4" fill="#ffe29a" opacity="0.8"/>
+    <rect x="850" y="16" width="35" height="16" rx="3"/>
+    <ellipse cx="867" cy="32" rx="14" ry="4" fill="#ffe29a" opacity="0.8"/>
+    <rect x="1150" y="16" width="35" height="16" rx="3"/>
+    <ellipse cx="1167" cy="32" rx="14" ry="4" fill="#ffe29a" opacity="0.8"/>
+  </g>
+</svg>
